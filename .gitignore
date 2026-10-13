@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/TestResults/
+**/Generated Files/
+**/AppPackages/
+**/BundleArtifacts/
+*.user
+*.suo
+*.log
+*.tmp
+dist/
+.dev-tools/

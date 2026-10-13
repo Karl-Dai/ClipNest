@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ClipNest (Unpackaged)": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}
