@@ -12,7 +12,7 @@
         <Grid.RowDefinitions><RowDefinition Height="44"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <Grid x:Name="TitleBarArea" Background="Transparent" Margin="20,0,140,0">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <FontIcon Glyph="&#xE8C8;" FontSize="18" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                <Image Source="ms-appx:///Assets/BrandMarkSmall.png" Width="24" Height="24" AutomationProperties.Name="拾贴图标"/>
                 <TextBlock Text="拾贴" FontWeight="SemiBold" VerticalAlignment="Center"/><TextBlock Text="ClipNest" Style="{StaticResource MetaTextStyle}" VerticalAlignment="Center"/>
             </StackPanel>
         </Grid>
@@ -58,7 +58,7 @@
                     </ListView.ItemTemplate>
                 </ListView>
                 <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" Margin="24" IsHitTestVisible="False">
-                    <FontIcon Glyph="&#xE8C8;" FontSize="36" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><TextBlock x:Name="EmptyTitle" Text="从一次复制开始" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <Image Source="ms-appx:///Assets/BrandMark.png" Width="56" Height="56" AutomationProperties.Name="拾贴图标"/><TextBlock x:Name="EmptyTitle" Text="从一次复制开始" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
                     <TextBlock x:Name="EmptyHint" Text="复制文字、图片或文件，拾贴会替你记住。" TextWrapping="Wrap" Style="{StaticResource MetaTextStyle}" TextAlignment="Center"/>
                 </StackPanel>
             </Grid>

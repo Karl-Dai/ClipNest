@@ -53,7 +53,7 @@
     <None Include="Package.appxmanifest" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Assets\app.ico">
+    <Content Update="Assets\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
