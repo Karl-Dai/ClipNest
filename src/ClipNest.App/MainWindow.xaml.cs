@@ -44,17 +44,35 @@ public sealed partial class MainWindow : Window, IDisposable
         _capture = App.Services.GetRequiredService<ClipboardCaptureService>();
         InitializeComponent();
         _appearance = UiPreferences.Load(_paths.Root);
+        if (_appearance.LayoutVersion < 1)
+        {
+            _appearance.ShowPreview = false;
+            _appearance.LayoutVersion = 1;
+        }
         Root.RequestedTheme = _appearance.Theme;
         _previewRequested = _appearance.ShowPreview;
         Title = "拾贴 ClipNest — 剪贴板历史";
         _desktop = new DesktopIntegration(WinRT.Interop.WindowNative.GetWindowHandle(this));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
-        AppWindow.TitleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
-        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
-        Root.ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(UpdateCaptionColors);
-        Root.Loaded += (_, _) => UpdateCaptionColors();
-        ResizePanel(_previewRequested ? 940 : 560, 660);
+        var floating = Microsoft.UI.Windowing.OverlappedPresenter.CreateForToolWindow();
+        floating.SetBorderAndTitleBar(true, false);
+        floating.IsResizable = false;
+        floating.IsMinimizable = false;
+        floating.IsMaximizable = false;
+        floating.IsAlwaysOnTop = true;
+        AppWindow.SetPresenter(floating);
+        AppWindow.IsShownInSwitchers = false;
+        ResizePanel(_previewRequested ? 880 : 520, 480);
+        Activated += (_, e) =>
+        {
+            if (e.WindowActivationState == WindowActivationState.Deactivated)
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    // Owned flyouts and settings must not dismiss the panel.
+                    if (!_busy && !DesktopIntegration.IsAppForeground && AppWindow.IsVisible) Hide();
+                });
+        };
         _desktop.ToggleRequested += (_, _) =>
         {
             if (_busy) return;
@@ -75,6 +93,7 @@ public sealed partial class MainWindow : Window, IDisposable
     public void ShowHistory()
     {
         _desktop.RememberForeground();
+        if (!AppWindow.IsVisible) PositionAtPointer();
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter
             && presenter.State == Microsoft.UI.Windowing.OverlappedPresenterState.Minimized)
             presenter.Restore();
@@ -96,21 +115,20 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private void Hide() => AppWindow.Hide();
+    private void OnDismissClicked(object sender, RoutedEventArgs e) { if (!_busy) Hide(); }
 
-    private void UpdateCaptionColors()
+    private void PositionAtPointer()
     {
-        if (CaptionPalette.BorderBrush is Microsoft.UI.Xaml.Media.SolidColorBrush foreground)
-        {
-            AppWindow.TitleBar.ButtonForegroundColor = foreground.Color;
-            AppWindow.TitleBar.ButtonInactiveForegroundColor = foreground.Color;
-            AppWindow.TitleBar.ButtonHoverForegroundColor = foreground.Color;
-            AppWindow.TitleBar.ButtonPressedForegroundColor = foreground.Color;
-        }
-        if (CaptionPalette.Background is Microsoft.UI.Xaml.Media.SolidColorBrush background)
-        {
-            AppWindow.TitleBar.ButtonHoverBackgroundColor = background.Color;
-            AppWindow.TitleBar.ButtonPressedBackgroundColor = background.Color;
-        }
+        var point = DesktopIntegration.PointerPosition;
+        var area = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(point,
+            Microsoft.UI.Windowing.DisplayAreaFallback.Nearest).WorkArea;
+        // Move to the target monitor before reading the window's DPI.
+        AppWindow.Move(point);
+        ResizePanel(_previewRequested ? 880 : 520, 480);
+        var size = AppWindow.Size;
+        AppWindow.Move(new Windows.Graphics.PointInt32(
+            Math.Clamp(point.X + 12, area.X, area.X + Math.Max(0, area.Width - size.Width)),
+            Math.Clamp(point.Y + 12, area.Y, area.Y + Math.Max(0, area.Height - size.Height))));
     }
 
     private void ResizePanel(int width, int height)
@@ -121,7 +139,9 @@ public sealed partial class MainWindow : Window, IDisposable
         var w = Math.Min((int)(width * scale), area.Width);
         var h = Math.Min((int)(height * scale), area.Height);
         AppWindow.Resize(new Windows.Graphics.SizeInt32(w, h));
-        AppWindow.Move(new Windows.Graphics.PointInt32(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
+        AppWindow.Move(new Windows.Graphics.PointInt32(
+            Math.Clamp(AppWindow.Position.X, area.X, area.X + area.Width - w),
+            Math.Clamp(AppWindow.Position.Y, area.Y, area.Y + area.Height - h)));
     }
 
     private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
@@ -143,7 +163,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _appearance.ShowPreview = _previewRequested;
         try { _appearance.Save(_paths.Root); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowError(ex); }
-        ResizePanel(_previewRequested ? 940 : 560, 660);
+        ResizePanel(_previewRequested ? 880 : 520, 480);
         ApplyLayout();
     }
 
@@ -298,7 +318,7 @@ public sealed partial class MainWindow : Window, IDisposable
         _busy = true;
         try
         {
-            var confirm = new ContentDialog { Title = "删除这条记录？", Content = "所选的" + HistoryRow.KindName(entry.Kind) + "记录将从历史中移除，此操作无法撤销。", PrimaryButtonText = "删除", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, XamlRoot = Root.XamlRoot };
+            var confirm = new ContentDialog { Title = "删除这条记录？", Content = "所选的" + HistoryRow.KindName(entry.Kind) + "记录将从历史中移除，此操作无法撤销。", PrimaryButtonText = "删除", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
             if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
             _store.DeleteById(entry.Id);
             if (entry.BlobPath is not null) _blobs.Delete(entry.BlobPath);
@@ -342,7 +362,7 @@ public sealed partial class MainWindow : Window, IDisposable
             var panel = new StackPanel { Spacing = 18, MaxWidth = 480 };
             var theme = new ComboBox { Header = "外观", ItemsSource = new[] { "跟随系统", "浅色", "深色" }, SelectedIndex = (int)Root.RequestedTheme, HorizontalAlignment = HorizontalAlignment.Stretch };
             panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup); panel.Children.Add(info);
-            var dialog = new ContentDialog { Title = "设置", Content = panel, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot };
+            var dialog = new ContentDialog { Title = "设置", Content = panel, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
             {
@@ -356,7 +376,7 @@ public sealed partial class MainWindow : Window, IDisposable
             }
             else if (result == ContentDialogResult.Secondary)
             {
-                var confirm = new ContentDialog { Title = "清理未收藏的历史？", Content = "收藏的内容会保留。此操作无法撤销。", PrimaryButtonText = "清理", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, XamlRoot = Root.XamlRoot };
+                var confirm = new ContentDialog { Title = "清理未收藏的历史？", Content = "收藏的内容会保留。此操作无法撤销。", PrimaryButtonText = "清理", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
                 if (await confirm.ShowAsync() == ContentDialogResult.Primary)
                 {
                     foreach (var blob in _store.ClearHistory()) _blobs.Delete(blob);

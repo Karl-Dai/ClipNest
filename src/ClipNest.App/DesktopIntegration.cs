@@ -48,6 +48,18 @@ internal sealed class DesktopIntegration : IDisposable
 
     public bool HasPasteTarget => _pasteTarget != 0 && IsWindow(_pasteTarget);
     public bool IsForeground => GetForegroundWindow() == _window;
+    public static bool IsAppForeground
+    {
+        get
+        {
+            if (GetWindowThreadProcessId(GetForegroundWindow(), out var pid) == 0) return false;
+            return pid == (uint)System.Environment.ProcessId;
+        }
+    }
+    public static Windows.Graphics.PointInt32 PointerPosition
+    {
+        get { GetCursorPos(out var point); return new(point.X, point.Y); }
+    }
 
     public async Task<bool> PasteAsync()
     {
@@ -95,6 +107,8 @@ internal sealed class DesktopIntegration : IDisposable
     }
 
     private delegate nint SubclassProc(nint hwnd, uint msg, nuint wp, nint lp, nuint id, nuint data);
+    [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out POINT point);
     [StructLayout(LayoutKind.Sequential)] private struct INPUT { public uint type; public InputUnion data; }
     [StructLayout(LayoutKind.Explicit)] private struct InputUnion
     { [FieldOffset(0)] public KEYBDINPUT keyboard; [FieldOffset(0)] public MOUSEINPUT mouse; }

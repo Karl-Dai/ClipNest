@@ -7,7 +7,8 @@ namespace ClipNest.App;
 internal sealed class UiPreferences
 {
     public ElementTheme Theme { get; set; }
-    public bool ShowPreview { get; set; } = true;
+    public bool ShowPreview { get; set; }
+    public int LayoutVersion { get; set; }
 
     public static UiPreferences Load(string root)
     {
