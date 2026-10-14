@@ -30,7 +30,8 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _timer;
     private bool _ready;
     private bool _busy;
-    private DateTimeOffset _statusUntil;
+    private bool _previewRequested = true;
+    private readonly UiPreferences _appearance;
     private IReadOnlyList<ClipboardEntry> _lastEntries = Array.Empty<ClipboardEntry>();
     private ClipboardEntry? Selected => (HistoryList.SelectedItem as HistoryRow)?.Entry;
 
@@ -42,19 +43,30 @@ public sealed partial class MainWindow : Window, IDisposable
         _settings = App.Services.GetRequiredService<IAppSettingsStore>();
         _capture = App.Services.GetRequiredService<ClipboardCaptureService>();
         InitializeComponent();
+        _appearance = UiPreferences.Load(_paths.Root);
+        Root.RequestedTheme = _appearance.Theme;
+        _previewRequested = _appearance.ShowPreview;
         Title = "拾贴 ClipNest — 剪贴板历史";
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1120, 740));
-        var display = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
-        var area = display.WorkArea;
-        AppWindow.Move(new Windows.Graphics.PointInt32(area.X + Math.Max(0, (area.Width - 1120) / 2), area.Y + Math.Max(0, (area.Height - 740) / 2)));
         _desktop = new DesktopIntegration(WinRT.Interop.WindowNative.GetWindowHandle(this));
-        _desktop.ToggleRequested += (_, _) => { if (_desktop.IsForeground) Hide(); else ShowHistory(); };
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(TitleBarArea);
+        AppWindow.TitleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+        AppWindow.TitleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+        Root.ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(UpdateCaptionColors);
+        Root.Loaded += (_, _) => UpdateCaptionColors();
+        ResizePanel(_previewRequested ? 940 : 560, 660);
+        _desktop.ToggleRequested += (_, _) =>
+        {
+            if (_busy) return;
+            if (AppWindow.IsVisible && _desktop.IsForeground) Hide(); else ShowHistory();
+        };
         AppWindow.Closing += (_, args) => { args.Cancel = true; Hide(); };
         _timer = DispatcherQueue.CreateTimer();
         _timer.Interval = TimeSpan.FromSeconds(1);
         _timer.Tick += (_, _) => { if (AppWindow.IsVisible && !_busy) Refresh(); };
         _timer.Start();
         _ready = true;
+        ApplyLayout();
         Refresh(true);
         if (!_desktop.HotkeyRegistered)
             HotkeyHint.Text = "快捷键已被占用 · 请通过托盘打开";
@@ -68,6 +80,10 @@ public sealed partial class MainWindow : Window, IDisposable
             presenter.Restore();
         AppWindow.Show();
         Activate();
+        AppWindow.MoveInZOrderAtTop();
+        _desktop.BringToForeground();
+        _desktop.TryRegisterHotkey();
+        HotkeyHint.Text = _desktop.HotkeyRegistered ? "Ctrl + Shift + V 唤出" : "快捷键被占用 · 通过托盘打开";
         Refresh(true);
         SearchBox.Focus(FocusState.Programmatic);
         SearchBox.SelectAll();
@@ -81,26 +97,76 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void Hide() => AppWindow.Hide();
 
+    private void UpdateCaptionColors()
+    {
+        if (CaptionPalette.BorderBrush is Microsoft.UI.Xaml.Media.SolidColorBrush foreground)
+        {
+            AppWindow.TitleBar.ButtonForegroundColor = foreground.Color;
+            AppWindow.TitleBar.ButtonInactiveForegroundColor = foreground.Color;
+            AppWindow.TitleBar.ButtonHoverForegroundColor = foreground.Color;
+            AppWindow.TitleBar.ButtonPressedForegroundColor = foreground.Color;
+        }
+        if (CaptionPalette.Background is Microsoft.UI.Xaml.Media.SolidColorBrush background)
+        {
+            AppWindow.TitleBar.ButtonHoverBackgroundColor = background.Color;
+            AppWindow.TitleBar.ButtonPressedBackgroundColor = background.Color;
+        }
+    }
+
+    private void ResizePanel(int width, int height)
+    {
+        var area = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id,
+            Microsoft.UI.Windowing.DisplayAreaFallback.Primary).WorkArea;
+        var scale = _desktop.DpiScale;
+        var w = Math.Min((int)(width * scale), area.Width);
+        var h = Math.Min((int)(height * scale), area.Height);
+        AppWindow.Resize(new Windows.Graphics.SizeInt32(w, h));
+        AppWindow.Move(new Windows.Graphics.PointInt32(area.X + (area.Width - w) / 2, area.Y + (area.Height - h) / 2));
+    }
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_ready) ApplyLayout();
+    }
+
+    private void ApplyLayout()
+    {
+        var show = _previewRequested && Root.ActualWidth >= 780;
+        PreviewPane.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        PreviewColumn.Width = new GridLength(show ? 344 : 0);
+        PreviewToggle.IsChecked = show;
+    }
+
+    private void OnPreviewClicked(object sender, RoutedEventArgs e)
+    {
+        _previewRequested = PreviewToggle.IsChecked == true;
+        _appearance.ShowPreview = _previewRequested;
+        try { _appearance.Save(_paths.Root); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { ShowError(ex); }
+        ResizePanel(_previewRequested ? 940 : 560, 660);
+        ApplyLayout();
+    }
+
     private void Refresh(bool force = false)
     {
         if (!_ready) return;
         try
         {
             var kind = (KindFilter.SelectedItem as ComboBoxItem)?.Tag as string;
-            var entries = _store.Search(SearchBox.Text, FavoritesButton.IsChecked == true, string.IsNullOrEmpty(kind) ? null : kind);
+            var entries = _store.Search(SearchBox.Text, HistoryFilter.SelectedItem == SavedFilter, string.IsNullOrEmpty(kind) ? null : kind);
             if (!force && _lastEntries.SequenceEqual(entries)) return;
             var selected = Selected?.Id;
             _lastEntries = entries;
-            var rows = entries.Select(e => new HistoryRow(e)).ToList();
+            var rows = entries.Select(e => new HistoryRow(e, _paths.Blobs)).ToList();
             HistoryList.ItemsSource = rows;
             HistoryList.SelectedItem = rows.FirstOrDefault(r => r.Entry.Id == selected) ?? rows.FirstOrDefault();
             EmptyState.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            EmptyHint.Text = string.IsNullOrWhiteSpace(SearchBox.Text) && FavoritesButton.IsChecked != true
-                ? "复制一段文字或一张图片，即可开始。" : "没有匹配的记录，试试其他关键词或筛选条件。";
+            var unfiltered = string.IsNullOrWhiteSpace(SearchBox.Text) && HistoryFilter.SelectedItem != SavedFilter && string.IsNullOrEmpty(kind);
+            EmptyTitle.Text = unfiltered ? "从一次复制开始" : "没有找到匹配的内容";
+            EmptyHint.Text = unfiltered ? "复制文字、图片或文件，拾贴会替你记住。" : "试试其他关键词，或切换到「最近 / 所有类型」。";
             foreach (var button in ActionButtons.Children.OfType<Button>()) button.IsEnabled = rows.Count > 0;
             if (rows.Count == 0) UpdatePreview();
-            if (DateTimeOffset.UtcNow >= _statusUntil)
-                StatusText.Text = $"{(_capture.IsPaused ? "已暂停记录" : "正在记录")} · 显示 {rows.Count} 条（最多 500 条）· 数据仅保存在本机";
+            StatusText.Text = $"{(_capture.IsPaused ? "已暂停" : "正在记录")} · {rows.Count} 条 · 仅本机";
         }
         catch (Exception ex) { ShowError(ex); }
     }
@@ -115,7 +181,10 @@ public sealed partial class MainWindow : Window, IDisposable
         PreviewTitle.Text = entry is null ? "内容预览" : HistoryRow.KindName(entry.Kind);
         PreviewMeta.Text = entry is null ? "选择左侧记录查看详情" : $"{entry.SourceApp ?? "未知应用"}  ·  {entry.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss}";
         PreviewText.Text = entry?.Content ?? string.Empty;
-        FavoriteButton.Content = entry?.IsFavorite == true ? "★ 已收藏" : "☆ 收藏";
+        FavoriteIcon.Glyph = entry?.IsFavorite == true ? "\uE735" : "\uE734";
+        var favoriteLabel = entry?.IsFavorite == true ? "取消收藏" : "收藏";
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(FavoriteButton, favoriteLabel);
+        ToolTipService.SetToolTip(FavoriteButton, favoriteLabel);
         if (entry is null) return;
         try
         {
@@ -140,13 +209,15 @@ public sealed partial class MainWindow : Window, IDisposable
     private string BlobFile(ClipboardEntry entry) => Path.Combine(_paths.Blobs, Path.GetFileName(entry.BlobPath!));
     private void ShowStatus(string message)
     {
-        _statusUntil = DateTimeOffset.UtcNow.AddSeconds(8);
-        StatusText.Text = message;
+        FeedbackBar.Severity = InfoBarSeverity.Informational;
+        FeedbackBar.Message = message;
+        FeedbackBar.IsOpen = true;
     }
     private void ShowError(Exception ex)
     {
         Serilog.Log.Error(ex, "User operation failed");
         ShowStatus("操作未完成：" + (string.IsNullOrWhiteSpace(ex.Message) ? "剪贴板或窗口暂时不可用，请重试。" : ex.Message));
+        FeedbackBar.Severity = InfoBarSeverity.Error;
     }
 
     private async Task CopyOrPasteAsync(bool paste)
@@ -192,8 +263,7 @@ public sealed partial class MainWindow : Window, IDisposable
             Hide();
             if (!await _desktop.PasteAsync())
             {
-                AppWindow.Show();
-                Activate();
+                ShowHistory();
                 ShowStatus("已复制，但未能自动粘贴。请切换到目标应用按 Ctrl + V（管理员窗口可能限制自动粘贴）。");
             }
         }
@@ -202,7 +272,7 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e) => Refresh();
-    private void OnFilterClicked(object sender, RoutedEventArgs e) => Refresh(true);
+    private void OnHistoryFilterChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) => Refresh(true);
     private void OnKindChanged(object sender, SelectionChangedEventArgs e) => Refresh(true);
     private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdatePreview();
     private async void OnPasteClicked(object sender, RoutedEventArgs e) => await CopyOrPasteAsync(true);
@@ -222,26 +292,33 @@ public sealed partial class MainWindow : Window, IDisposable
         try { _store.SetFavorite(entry.Id, !entry.IsFavorite); Refresh(true); }
         catch (Exception ex) { ShowError(ex); }
     }
-    private void OnDeleteClicked(object sender, RoutedEventArgs e)
+    private async void OnDeleteClicked(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } entry) return;
+        if (_busy || Selected is not { } entry) return;
+        _busy = true;
         try
         {
+            var confirm = new ContentDialog { Title = "删除这条记录？", Content = "所选的" + HistoryRow.KindName(entry.Kind) + "记录将从历史中移除，此操作无法撤销。", PrimaryButtonText = "删除", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close, XamlRoot = Root.XamlRoot };
+            if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
             _store.DeleteById(entry.Id);
             if (entry.BlobPath is not null) _blobs.Delete(entry.BlobPath);
             Refresh(true);
         }
         catch (Exception ex) { ShowError(ex); }
+        finally { _busy = false; }
     }
     private void OnPauseClicked(object sender, RoutedEventArgs e)
     {
         _capture.IsPaused = PauseButton.IsChecked == true;
-        PauseButton.Content = _capture.IsPaused ? "继续记录" : "暂停记录";
+        PauseIcon.Glyph = _capture.IsPaused ? "\uE768" : "\uE769";
+        var label = _capture.IsPaused ? "继续记录" : "暂停记录";
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(PauseButton, label);
+        ToolTipService.SetToolTip(PauseButton, label);
         Refresh(true);
     }
     private void OnRootKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Escape) { Hide(); e.Handled = true; }
+        if (e.Key == VirtualKey.Escape && !_busy) { Hide(); e.Handled = true; }
     }
     private async void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -263,7 +340,8 @@ public sealed partial class MainWindow : Window, IDisposable
             var info = new TextBlock { Text = "关闭窗口后仍在托盘运行；右键托盘可退出。\n快捷键：Ctrl + Shift + V。\n数据保存在：" + _paths.Root, TextWrapping = TextWrapping.Wrap };
             var startup = new CheckBox { Content = "登录 Windows 时启动", IsChecked = StartupRegistration.IsEnabled };
             var panel = new StackPanel { Spacing = 18, MaxWidth = 480 };
-            panel.Children.Add(limit); panel.Children.Add(startup); panel.Children.Add(info);
+            var theme = new ComboBox { Header = "外观", ItemsSource = new[] { "跟随系统", "浅色", "深色" }, SelectedIndex = (int)Root.RequestedTheme, HorizontalAlignment = HorizontalAlignment.Stretch };
+            panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup); panel.Children.Add(info);
             var dialog = new ContentDialog { Title = "设置", Content = panel, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot };
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
@@ -271,7 +349,10 @@ public sealed partial class MainWindow : Window, IDisposable
                 if (!double.IsFinite(limit.Value)) throw new InvalidOperationException("请输入 10–10000 之间的历史条数。");
                 _settings.SetHistoryLimit((int)Math.Clamp(limit.Value, 10, 10000));
                 StartupRegistration.SetEnabled(startup.IsChecked == true);
-                StatusText.Text = "设置已保存；历史上限在下次复制时应用。";
+                _appearance.Theme = (ElementTheme)theme.SelectedIndex;
+                _appearance.Save(_paths.Root);
+                Root.RequestedTheme = _appearance.Theme;
+                ShowStatus("设置已保存；历史上限在下次复制时应用。");
             }
             else if (result == ContentDialogResult.Secondary)
             {
@@ -291,13 +372,27 @@ public sealed partial class MainWindow : Window, IDisposable
 public sealed class HistoryRow
 {
     public ClipboardEntry Entry { get; }
-    public HistoryRow(ClipboardEntry entry) => Entry = entry;
-    public string Title => (Entry.IsFavorite ? "★  " : string.Empty) + (Entry.Kind switch
+    public BitmapImage? Thumbnail { get; }
+    public Visibility ThumbnailVisibility => Thumbnail is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility FavoriteVisibility => Entry.IsFavorite ? Visibility.Visible : Visibility.Collapsed;
+    public string Glyph => Entry.Kind switch
+    { ClipboardKind.Image => "\uEB9F", ClipboardKind.File => "\uE8A5", ClipboardKind.Color => "\uE790", ClipboardKind.Rtf => "\uE8D2", _ => "\uE8A4" };
+    public HistoryRow(ClipboardEntry entry, string blobs)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        Entry = entry;
+        if (entry.Kind == ClipboardKind.Image && entry.BlobPath is not null)
+        {
+            var path = Path.Combine(blobs, Path.GetFileName(entry.BlobPath));
+            if (File.Exists(path)) Thumbnail = new BitmapImage { DecodePixelWidth = 88, UriSource = new Uri(path) };
+        }
+    }
+    public string Title => Entry.Kind switch
     {
         ClipboardKind.Image => "图片 · 点击预览",
         ClipboardKind.Rtf => "富文本 · 点击预览",
         _ => (Entry.Content ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ') is var text && text.Length > 160 ? text[..160] + "…" : text,
-    });
+    };
     public string Subtitle => $"{KindName(Entry.Kind)}  ·  {Entry.SourceApp ?? "未知来源"}  ·  {Entry.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.CurrentCulture)}";
     public static string KindName(ClipboardKind kind) => kind switch
     { ClipboardKind.Text => "文本", ClipboardKind.Image => "图片", ClipboardKind.File => "文件", ClipboardKind.Color => "颜色", ClipboardKind.Rtf => "富文本", _ => "内容" };

@@ -9,7 +9,8 @@ internal sealed class DesktopIntegration : IDisposable
     private readonly SubclassProc _procedure;
     private nint _pasteTarget;
     public event EventHandler? ToggleRequested;
-    public bool HotkeyRegistered { get; }
+    public bool HotkeyRegistered { get; private set; }
+    public double DpiScale => GetDpiForWindow(_window) / 96d;
 
     public DesktopIntegration(nint window)
     {
@@ -17,8 +18,25 @@ internal sealed class DesktopIntegration : IDisposable
         _procedure = WindowProc;
         if (!SetWindowSubclass(window, _procedure, 1, 0))
             throw new InvalidOperationException("无法注册窗口消息处理程序。");
-        HotkeyRegistered = RegisterHotKey(window, 1, 0x4000 | 0x0002 | 0x0004, 0x56);
+        TryRegisterHotkey();
         RememberForeground();
+    }
+
+    public void TryRegisterHotkey()
+    {
+        if (HotkeyRegistered) return;
+        HotkeyRegistered = RegisterHotKey(_window, 1, 0x4000 | 0x0002 | 0x0004, 0x56);
+        if (HotkeyRegistered) Serilog.Log.Information("Global hotkey Ctrl+Shift+V registered");
+        else Serilog.Log.Warning("Global hotkey registration failed: {Error}", Marshal.GetLastWin32Error());
+    }
+
+    public void BringToForeground()
+    {
+        // Presenter state can lag the HWND after hiding/minimizing. Restore both.
+        ShowWindow(_window, IsIconic(_window) ? 9 : 5);
+        var activated = SetForegroundWindow(_window);
+        Serilog.Log.Information("History activation: foreground={Foreground}, minimized={Minimized}",
+            activated || IsForeground, IsIconic(_window));
     }
 
     public void RememberForeground()
@@ -62,6 +80,7 @@ internal sealed class DesktopIntegration : IDisposable
     {
         if (message == 0x0312 && wParam == 1)
         {
+            Serilog.Log.Information("Global hotkey received");
             RememberForeground();
             ToggleRequested?.Invoke(this, EventArgs.Empty);
             return 0;
@@ -86,7 +105,8 @@ internal sealed class DesktopIntegration : IDisposable
     [DllImport("comctl32.dll")] private static extern bool SetWindowSubclass(nint hwnd, SubclassProc proc, nuint id, nuint data);
     [DllImport("comctl32.dll")] private static extern bool RemoveWindowSubclass(nint hwnd, SubclassProc proc, nuint id);
     [DllImport("comctl32.dll")] private static extern nint DefSubclassProc(nint hwnd, uint msg, nuint wp, nint lp);
-    [DllImport("user32.dll")] private static extern bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(nint hwnd);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(nint hwnd, int id);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint hwnd);
