@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using ClipNest.Core.Environment;
 
 namespace ClipNest.App;
 
@@ -10,10 +11,13 @@ internal sealed class DesktopIntegration : IDisposable
     private nint _pasteTarget;
     public event EventHandler? ToggleRequested;
     public bool HotkeyRegistered { get; private set; }
+    public HotkeySetting Hotkey { get; private set; }
+    private int _hotkeyId = 1;
     public double DpiScale => GetDpiForWindow(_window) / 96d;
 
-    public DesktopIntegration(nint window)
+    public DesktopIntegration(nint window, HotkeySetting hotkey)
     {
+        Hotkey = hotkey.IsValid ? hotkey : HotkeySetting.Default;
         _window = window;
         _procedure = WindowProc;
         if (!SetWindowSubclass(window, _procedure, 1, 0))
@@ -25,9 +29,28 @@ internal sealed class DesktopIntegration : IDisposable
     public void TryRegisterHotkey()
     {
         if (HotkeyRegistered) return;
-        HotkeyRegistered = RegisterHotKey(_window, 1, 0x4000 | 0x0002 | 0x0004, 0x56);
-        if (HotkeyRegistered) Serilog.Log.Information("Global hotkey Ctrl+Shift+V registered");
+        HotkeyRegistered = RegisterHotKey(_window, _hotkeyId, 0x4000 | Hotkey.Modifiers, Hotkey.Key);
+        if (HotkeyRegistered) Serilog.Log.Information("Global hotkey {Hotkey} registered", Hotkey.Label);
         else Serilog.Log.Warning("Global hotkey registration failed: {Error}", Marshal.GetLastWin32Error());
+    }
+
+    public void ChangeHotkey(HotkeySetting candidate, Action persist)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ArgumentNullException.ThrowIfNull(persist);
+        if (!candidate.IsValid) throw new InvalidOperationException("快捷键需要包含 Ctrl 或 Alt，以及字母、数字或 F1–F11。");
+        if (candidate == Hotkey && HotkeyRegistered) { persist(); return; }
+        // Reserve the new combination first, so a conflict never releases the working hotkey.
+        var nextId = _hotkeyId == 1 ? 2 : 1;
+        if (!RegisterHotKey(_window, nextId, 0x4000 | candidate.Modifiers, candidate.Key))
+            throw new InvalidOperationException($"{candidate.Label} 已被占用或无法注册，请换一个组合。原快捷键未更改。");
+        try { persist(); }
+        catch { UnregisterHotKey(_window, nextId); throw; }
+        if (HotkeyRegistered) UnregisterHotKey(_window, _hotkeyId);
+        _hotkeyId = nextId;
+        Hotkey = candidate;
+        HotkeyRegistered = true;
+        Serilog.Log.Information("Global hotkey changed to {Hotkey}", Hotkey.Label);
     }
 
     public void BringToForeground()
@@ -81,7 +104,7 @@ internal sealed class DesktopIntegration : IDisposable
         return sent == inputs.Length;
     }
 
-    private static bool KeysHeld() => (GetAsyncKeyState(0x10) & 0x8000) != 0
+    private bool KeysHeld() => (GetAsyncKeyState((int)Hotkey.Key) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0
         || (GetAsyncKeyState(0x11) & 0x8000) != 0 || (GetAsyncKeyState(0x12) & 0x8000) != 0
         || (GetAsyncKeyState(0x0D) & 0x8000) != 0 || (GetAsyncKeyState(0x01) & 0x8000) != 0;
 
@@ -90,7 +113,7 @@ internal sealed class DesktopIntegration : IDisposable
 
     private nint WindowProc(nint hwnd, uint message, nuint wParam, nint lParam, nuint id, nuint data)
     {
-        if (message == 0x0312 && wParam == 1)
+        if (message == 0x0312 && wParam == (nuint)_hotkeyId)
         {
             Serilog.Log.Information("Global hotkey received");
             RememberForeground();
@@ -102,7 +125,7 @@ internal sealed class DesktopIntegration : IDisposable
 
     public void Dispose()
     {
-        UnregisterHotKey(_window, 1);
+        UnregisterHotKey(_window, _hotkeyId);
         RemoveWindowSubclass(_window, _procedure, 1);
     }
 

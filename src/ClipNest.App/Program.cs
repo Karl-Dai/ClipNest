@@ -12,6 +12,15 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--wait-for-exit" && int.TryParse(args[1], out var previousId))
+        {
+            try
+            {
+                using var previous = System.Diagnostics.Process.GetProcessById(previousId);
+                if (!previous.WaitForExit(30000)) return 1;
+            }
+            catch (ArgumentException) { /* The previous instance already exited. */ }
+        }
         WinRT.ComWrappersSupport.InitializeComWrappers();
 
         var activationArgs = AppInstance.GetCurrent().GetActivatedEventArgs();

@@ -80,6 +80,47 @@ public partial class App : Application
         // Allow default WinUI handling to continue; we just record it.
     }
 
+    internal async Task MoveDataAndRestartAsync(string destination)
+    {
+        var paths = Services.GetRequiredService<ClipNest.Core.Environment.IAppPaths>();
+        var database = Services.GetRequiredService<ClipNest.Core.Persistence.ClipNestDatabase>();
+        var monitor = Services.GetServices<IHostedService>().OfType<ClipNest.Platform.ClipboardMonitorHostedService>().Single();
+        var previousLocation = ClipNest.Core.Environment.DataLocationSettings.Load(HostBuilderExtensions.LocationFile);
+        var locationChanged = false;
+        // Stop on the UI thread, then await the final in-flight clipboard write.
+        await monitor.StopAsync(CancellationToken.None);
+        try
+        {
+            var target = await Task.Run(() => ClipNest.Core.Environment.DataDirectoryMigration.Copy(paths, destination, database));
+            new ClipNest.Core.Environment.DataLocationSettings(target.Root).Save(HostBuilderExtensions.LocationFile);
+            locationChanged = true;
+            var start = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = System.Environment.ProcessPath ?? throw new InvalidOperationException("无法确定程序位置。"),
+                UseShellExecute = false, CreateNoWindow = true, WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                WorkingDirectory = AppContext.BaseDirectory
+            };
+            start.ArgumentList.Add("--wait-for-exit");
+            start.ArgumentList.Add(System.Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            using var restarted = System.Diagnostics.Process.Start(start)
+                ?? throw new InvalidOperationException("无法重新启动程序。");
+        }
+        catch
+        {
+            try
+            {
+                if (locationChanged)
+                {
+                    if (previousLocation is null) System.IO.File.Delete(HostBuilderExtensions.LocationFile);
+                    else previousLocation.Save(HostBuilderExtensions.LocationFile);
+                }
+            }
+            finally { await monitor.StartAsync(CancellationToken.None); }
+            throw;
+        }
+        Shutdown();
+    }
+
     /// <summary>Invoked by the tray "Quit" command. Flushes logs then exits.</summary>
     internal void Shutdown()
     {

@@ -11,7 +11,9 @@ public sealed class AppPaths : IAppPaths
 {
     private const string AppFolderName = "ClipNest";
 
-    public AppPaths(string baseDirectory)
+    public AppPaths(string baseDirectory) : this(baseDirectory, false) { }
+
+    private AppPaths(string baseDirectory, bool exactRoot)
     {
         if (string.IsNullOrWhiteSpace(baseDirectory))
         {
@@ -19,7 +21,7 @@ public sealed class AppPaths : IAppPaths
                 "Base directory must be non-empty.", nameof(baseDirectory));
         }
 
-        Root = Path.Combine(baseDirectory, AppFolderName);
+        Root = exactRoot ? Path.GetFullPath(baseDirectory) : Path.Combine(baseDirectory, AppFolderName);
         Database = Path.Combine(Root, "db");
         Cache = Path.Combine(Root, "cache");
         Logs = Path.Combine(Root, "logs");
@@ -33,6 +35,8 @@ public sealed class AppPaths : IAppPaths
     public string Logs { get; }
     public string Blobs { get; }
     public string SettingsFile { get; }
+
+    public static AppPaths FromRoot(string root) => new(root, true);
 
     /// <summary>Default instance rooted at <c>%LOCALAPPDATA%\ClipNest</c>.</summary>
     public static AppPaths Default { get; } = new AppPaths(

@@ -55,7 +55,7 @@ public sealed partial class MainWindow : Window, IDisposable
         Root.RequestedTheme = _appearance.Theme;
         _previewRequested = _appearance.ShowPreview;
         Title = "拾贴 ClipNest — 剪贴板历史";
-        _desktop = new DesktopIntegration(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        _desktop = new DesktopIntegration(WinRT.Interop.WindowNative.GetWindowHandle(this), _appearance.Hotkey);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarArea);
         var floating = Microsoft.UI.Windowing.OverlappedPresenter.CreateForToolWindow();
@@ -91,6 +91,7 @@ public sealed partial class MainWindow : Window, IDisposable
         Refresh(true);
         if (!_desktop.HotkeyRegistered)
             HotkeyHint.Text = "快捷键已被占用 · 请通过托盘打开";
+        if (Hosting.HostBuilderExtensions.StartupWarning is { } warning) ShowStatus(warning);
     }
 
     public void ShowHistory()
@@ -105,7 +106,7 @@ public sealed partial class MainWindow : Window, IDisposable
         AppWindow.MoveInZOrderAtTop();
         _desktop.BringToForeground();
         _desktop.TryRegisterHotkey();
-        HotkeyHint.Text = _desktop.HotkeyRegistered ? "Ctrl + Shift + V 唤出" : "快捷键被占用 · 通过托盘打开";
+        UpdateHotkeyHint();
         Refresh(true);
         SearchBox.Focus(FocusState.Programmatic);
         SearchBox.SelectAll();
@@ -118,6 +119,8 @@ public sealed partial class MainWindow : Window, IDisposable
     }
 
     private void Hide() => AppWindow.Hide();
+    private void UpdateHotkeyHint() => HotkeyHint.Text = _desktop.HotkeyRegistered
+        ? _desktop.Hotkey.Label + " 唤出" : "快捷键被占用 · 通过托盘打开";
     private void OnDismissClicked(object sender, RoutedEventArgs e) { if (!_busy) Hide(); }
 
     private void PositionAtPointer()
@@ -366,22 +369,92 @@ public sealed partial class MainWindow : Window, IDisposable
         try
         {
             var limit = new NumberBox { Header = "历史记录上限（收藏不计入）", Minimum = 10, Maximum = 10000, Value = _settings.GetHistoryLimit(), SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-            var info = new TextBlock { Text = "关闭窗口后仍在托盘运行；右键托盘可退出。\n快捷键：Ctrl + Shift + V。\n数据保存在：" + _paths.Root, TextWrapping = TextWrapping.Wrap };
             var startup = new CheckBox { Content = "登录 Windows 时启动", IsChecked = StartupRegistration.IsEnabled };
-            var panel = new StackPanel { Spacing = 18, MaxWidth = 480 };
+            var panel = new StackPanel { Spacing = 16, MinWidth = 300, MaxWidth = 440 };
             var theme = new ComboBox { Header = "外观", ItemsSource = new[] { "跟随系统", "浅色", "深色" }, SelectedIndex = (int)Root.RequestedTheme, HorizontalAlignment = HorizontalAlignment.Stretch };
-            panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup); panel.Children.Add(info);
-            var dialog = new ContentDialog { Title = "设置", Content = panel, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
+            var ctrl = new CheckBox { Content = "Ctrl", IsChecked = (_desktop.Hotkey.Modifiers & 2) != 0, MinWidth = 0 };
+            var shift = new CheckBox { Content = "Shift", IsChecked = (_desktop.Hotkey.Modifiers & 4) != 0, MinWidth = 0 };
+            var alt = new CheckBox { Content = "Alt", IsChecked = (_desktop.Hotkey.Modifiers & 1) != 0, MinWidth = 0 };
+            var keyOptions = Enumerable.Range(0x41, 26).Concat(Enumerable.Range(0x30, 10)).Concat(Enumerable.Range(0x70, 11)).Select(k => (uint)k).ToArray();
+            var key = new ComboBox { ItemsSource = keyOptions.Select(k => new HotkeySetting(2, k).KeyLabel).ToArray(), SelectedIndex = Array.IndexOf(keyOptions, _desktop.Hotkey.Key), Width = 76 };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(key, "快捷键主键");
+            var hotkeyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
+            hotkeyRow.Children.Add(ctrl); hotkeyRow.Children.Add(shift); hotkeyRow.Children.Add(alt); hotkeyRow.Children.Add(key);
+            var shortcut = new StackPanel { Spacing = 8 };
+            shortcut.Children.Add(new TextBlock { Text = "唤出快捷键", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            shortcut.Children.Add(hotkeyRow);
+            var resetHotkey = new HyperlinkButton { Content = "恢复 Ctrl + Shift + V", Padding = new Thickness(0) };
+            resetHotkey.Click += (_, _) => { ctrl.IsChecked = true; shift.IsChecked = true; alt.IsChecked = false; key.SelectedIndex = Array.IndexOf(keyOptions, 0x56u); };
+            shortcut.Children.Add(resetHotkey);
+            var location = new TextBox { Header = "数据文件夹", Text = _paths.Root, TextWrapping = TextWrapping.Wrap, MaxHeight = 88 };
+            var browse = new Button { Content = "选择文件夹…" };
+            var locationHint = new TextBlock { Text = "选择空文件夹。保存后迁移历史、收藏、图片和设置并重启，原目录保留备份。", TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+            var error = new InfoBar { IsOpen = false, Severity = InfoBarSeverity.Error, IsClosable = false };
+            browse.Click += async (_, _) =>
+            {
+                try
+                {
+                    var picker = new Windows.Storage.Pickers.FolderPicker();
+                    picker.FileTypeFilter.Add("*");
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                    var folder = await picker.PickSingleFolderAsync();
+                    if (folder is not null) location.Text = folder.Path;
+                }
+                catch (Exception ex) { error.Message = "无法打开文件夹选择器，也可以直接填写路径。" + ex.Message; error.IsOpen = true; }
+            };
+            panel.Children.Add(shortcut); panel.Children.Add(location); panel.Children.Add(browse); panel.Children.Add(locationHint);
+            panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup);
+            var scroll = new ScrollViewer { Content = panel, MaxHeight = Math.Max(180, Root.ActualHeight - 210), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            var content = new StackPanel { Spacing = 8 };
+            content.Children.Add(error); content.Children.Add(scroll);
+            string? newLocation = null;
+            var dialog = new ContentDialog { Title = "设置", Content = content, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
+            dialog.PrimaryButtonClick += (_, args) =>
+            {
+                try
+                {
+                    var destination = DataDirectoryMigration.Normalize(location.Text);
+                    newLocation = DataDirectoryMigration.SameLocation(destination, _paths.Root) ? null : destination;
+                    if (newLocation is not null)
+                    {
+                        DataDirectoryMigration.ValidateTarget(_paths.Root, newLocation);
+                        var configFolder = Path.GetDirectoryName(Hosting.HostBuilderExtensions.LocationFile)!;
+                        if (DataDirectoryMigration.SameLocation(newLocation, configFolder)
+                            || configFolder.StartsWith(newLocation + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                            || newLocation.StartsWith(configFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                            throw new IOException("请选择其他文件夹，不能使用程序的配置目录。");
+                    }
+                    if (!double.IsFinite(limit.Value) || limit.Value < 10 || limit.Value > 10000)
+                        throw new InvalidOperationException("请输入 10–10000 之间的历史条数。");
+                    var candidate = new HotkeySetting((ctrl.IsChecked == true ? 2u : 0u) | (shift.IsChecked == true ? 4u : 0u) | (alt.IsChecked == true ? 1u : 0u), keyOptions[key.SelectedIndex]);
+                    _desktop.ChangeHotkey(candidate, () =>
+                    {
+                        var oldHotkey = _appearance.Hotkey;
+                        var oldTheme = _appearance.Theme;
+                        try
+                        {
+                            _appearance.Hotkey = candidate;
+                            _appearance.Theme = (ElementTheme)theme.SelectedIndex;
+                            _appearance.Save(_paths.Root);
+                        }
+                        catch { _appearance.Hotkey = oldHotkey; _appearance.Theme = oldTheme; throw; }
+                    });
+                    UpdateHotkeyHint();
+                    _settings.SetHistoryLimit((int)limit.Value);
+                    if (StartupRegistration.IsEnabled != (startup.IsChecked == true)) StartupRegistration.SetEnabled(startup.IsChecked == true);
+                    Root.RequestedTheme = _appearance.Theme;
+                }
+                catch (Exception ex) { args.Cancel = true; error.Message = ex.Message; error.IsOpen = true; }
+            };
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
             {
-                if (!double.IsFinite(limit.Value)) throw new InvalidOperationException("请输入 10–10000 之间的历史条数。");
-                _settings.SetHistoryLimit((int)Math.Clamp(limit.Value, 10, 10000));
-                StartupRegistration.SetEnabled(startup.IsChecked == true);
-                _appearance.Theme = (ElementTheme)theme.SelectedIndex;
-                _appearance.Save(_paths.Root);
-                Root.RequestedTheme = _appearance.Theme;
-                ShowStatus("设置已保存；历史上限在下次复制时应用。");
+                if (newLocation is not null)
+                {
+                    ShowStatus("正在迁移数据，完成后将自动重启…");
+                    await ((App)Application.Current).MoveDataAndRestartAsync(newLocation);
+                }
+                else ShowStatus("设置已保存，快捷键已生效。");
             }
             else if (result == ContentDialogResult.Secondary)
             {
