@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$Configuration = 'Release', [string]$Version = '0.2.1')
+param([string]$Configuration = 'Release', [string]$Version = '0.2.2')
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path "$PSScriptRoot/..").Path
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue

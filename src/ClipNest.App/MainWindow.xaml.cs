@@ -44,10 +44,13 @@ public sealed partial class MainWindow : Window, IDisposable
         _capture = App.Services.GetRequiredService<ClipboardCaptureService>();
         InitializeComponent();
         _appearance = UiPreferences.Load(_paths.Root);
-        if (_appearance.LayoutVersion < 1)
+        if (_appearance.LayoutVersion < 2)
         {
-            _appearance.ShowPreview = false;
-            _appearance.LayoutVersion = 1;
+            _appearance.ShowPreview = true;
+            _appearance.LayoutVersion = 2;
+            try { _appearance.Save(_paths.Root); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { Serilog.Log.Warning(ex, "Could not save preview layout preference"); }
         }
         Root.RequestedTheme = _appearance.Theme;
         _previewRequested = _appearance.ShowPreview;
@@ -154,6 +157,7 @@ public sealed partial class MainWindow : Window, IDisposable
         var show = _previewRequested && Root.ActualWidth >= 780;
         PreviewPane.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         PreviewColumn.Width = new GridLength(show ? 344 : 0);
+        SearchArea.Margin = new Thickness(16, 4, show ? 360 : 16, 8);
         PreviewToggle.IsChecked = show;
     }
 
@@ -342,8 +346,13 @@ public sealed partial class MainWindow : Window, IDisposable
     }
     private async void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Down && HistoryList.Items.Count > 0)
-        { HistoryList.Focus(FocusState.Programmatic); e.Handled = true; }
+        if (e.Key is VirtualKey.Down or VirtualKey.Up && HistoryList.Items.Count > 0)
+        {
+            var next = HistoryList.SelectedIndex + (e.Key == VirtualKey.Down ? 1 : -1);
+            HistoryList.SelectedIndex = Math.Clamp(next, 0, HistoryList.Items.Count - 1);
+            HistoryList.ScrollIntoView(HistoryList.SelectedItem);
+            e.Handled = true;
+        }
         else if (e.Key == VirtualKey.Enter) { e.Handled = true; await CopyOrPasteAsync(true); }
     }
     private async void OnListKeyDown(object sender, KeyRoutedEventArgs e)
@@ -409,8 +418,8 @@ public sealed class HistoryRow
     }
     public string Title => Entry.Kind switch
     {
-        ClipboardKind.Image => "图片 · 点击预览",
-        ClipboardKind.Rtf => "富文本 · 点击预览",
+        ClipboardKind.Image => "图片",
+        ClipboardKind.Rtf => "富文本",
         _ => (Entry.Content ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ') is var text && text.Length > 160 ? text[..160] + "…" : text,
     };
     public string Subtitle => $"{KindName(Entry.Kind)}  ·  {Entry.SourceApp ?? "未知来源"}  ·  {Entry.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.CurrentCulture)}";

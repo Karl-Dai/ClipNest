@@ -21,12 +21,12 @@
             <Button Style="{StaticResource IconButtonStyle}" Click="OnSettingsClicked" AutomationProperties.Name="设置" ToolTipService.ToolTip="设置"><FontIcon Glyph="&#xE713;" FontSize="14"/></Button>
             <Button Style="{StaticResource IconButtonStyle}" Click="OnDismissClicked" AutomationProperties.Name="收起面板" ToolTipService.ToolTip="收起（Esc）"><FontIcon Glyph="&#xE711;" FontSize="12"/></Button>
         </StackPanel>
-        <StackPanel Grid.Row="1" Margin="16,4,16,8" Spacing="8">
+        <StackPanel x:Name="SearchArea" Grid.Row="1" Margin="16,4,16,8" Spacing="8">
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Spacing="8">
                     <Grid>
-                        <TextBox x:Name="SearchBox" Padding="38,10,34,10" MinHeight="44" FontSize="15" PlaceholderText="搜索内容或来源应用" TextChanged="OnSearchChanged" KeyDown="OnSearchKeyDown" AutomationProperties.Name="搜索剪贴板历史"/>
+                        <TextBox x:Name="SearchBox" Padding="38,10,34,10" MinHeight="44" FontSize="15" PlaceholderText="搜索内容或来源应用" TextChanged="OnSearchChanged" PreviewKeyDown="OnSearchKeyDown" AutomationProperties.Name="搜索剪贴板历史"/>
                         <FontIcon Glyph="&#xE721;" FontSize="16" HorizontalAlignment="Left" Margin="13,0,0,0" IsHitTestVisible="False" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                     </Grid>
                 </StackPanel>
@@ -42,7 +42,7 @@
         <Grid Grid.Row="2" Margin="8,0,8,0" x:Name="ContentArea">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="PreviewColumn" Width="344"/></Grid.ColumnDefinitions>
             <Grid>
-                <ListView x:Name="HistoryList" SelectionMode="Single" SelectionChanged="OnSelectionChanged" DoubleTapped="OnItemDoubleTapped" KeyDown="OnListKeyDown" AutomationProperties.Name="历史记录">
+                <ListView x:Name="HistoryList" SelectionMode="Single" SingleSelectionFollowsFocus="True" SelectionChanged="OnSelectionChanged" DoubleTapped="OnItemDoubleTapped" KeyDown="OnListKeyDown" AutomationProperties.Name="历史记录">
                     <ListView.ItemContainerStyle><Style TargetType="ListViewItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="8,4"/><Setter Property="Margin" Value="0,2"/><Setter Property="CornerRadius" Value="8"/></Style></ListView.ItemContainerStyle>
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="local:HistoryRow">
@@ -62,19 +62,19 @@
                     <TextBlock x:Name="EmptyHint" Text="复制文字、图片或文件，拾贴会替你记住。" TextWrapping="Wrap" Style="{StaticResource MetaTextStyle}" TextAlignment="Center"/>
                 </StackPanel>
             </Grid>
-            <Border x:Name="PreviewPane" Grid.Column="1" Margin="16,0,0,0" Padding="20" CornerRadius="12" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+        </Grid>
+            <Border x:Name="PreviewPane" Grid.Row="1" Grid.RowSpan="2" Width="328" HorizontalAlignment="Right" Margin="0,4,8,0" Padding="16" CornerRadius="12" Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <Grid RowSpacing="16">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <StackPanel Spacing="8"><TextBlock Text="内容预览" Style="{StaticResource MetaTextStyle}"/><TextBlock x:Name="PreviewTitle" Text="选择一条记录" FontSize="20" FontWeight="SemiBold"/><TextBlock x:Name="PreviewMeta" Style="{StaticResource MetaTextStyle}" TextWrapping="Wrap"/><Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4,0,0"/></StackPanel>
                     <Grid Grid.Row="1">
                         <ScrollViewer x:Name="TextScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><TextBlock x:Name="PreviewText" IsTextSelectionEnabled="True" TextWrapping="Wrap" FontSize="15" LineHeight="24"/></ScrollViewer>
-                        <ScrollViewer x:Name="ImageScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"><Image x:Name="PreviewImage" Stretch="Uniform"/></ScrollViewer>
+                        <Grid x:Name="ImageScroll" Visibility="Collapsed"><Image x:Name="PreviewImage" Stretch="Uniform" AutomationProperties.Name="所选记录的图片预览"/></Grid>
                         <RichEditBox x:Name="RtfPreview" IsReadOnly="True" Visibility="Collapsed"/>
                     </Grid>
                     <TextBlock Grid.Row="2" Text="↑ ↓ 选择    ·    Enter 粘贴" Style="{StaticResource MetaTextStyle}"/>
                 </Grid>
             </Border>
-        </Grid>
         <StackPanel Grid.Row="3" Margin="16,8,16,0" Spacing="8">
             <InfoBar x:Name="FeedbackBar" IsOpen="False" IsClosable="True" Severity="Informational"/>
             <Grid>
