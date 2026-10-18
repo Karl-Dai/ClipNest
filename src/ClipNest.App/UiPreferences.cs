@@ -11,6 +11,7 @@ internal sealed class UiPreferences
     public bool ShowPreview { get; set; } = true;
     public int LayoutVersion { get; set; }
     public HotkeySetting Hotkey { get; set; } = HotkeySetting.Default;
+    public bool AutomaticUpdates { get; set; } = true;
 
     public static UiPreferences Load(string root)
     {

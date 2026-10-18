@@ -1,0 +1,39 @@
+name: Publish Windows Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.4.0)'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build installer, portable and update packages
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a stable SemVer version' }
+          ./build/package.ps1 -Version $env:RELEASE_VERSION
+      - name: Upload assets to draft, then publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:RELEASE_VERSION
+          $files = @("dist/ClipNest-$version-Setup-x64.exe", "dist/ClipNest-$version-win-x64.zip", "dist/SHA256SUMS-$version.txt")
+          $files += @(Get-ChildItem dist -File | Where-Object { $_.Name -match '\.nupkg$|^releases\.win\.json$|^RELEASES$' } | Select-Object -ExpandProperty FullName)
+          gh release create "v$version" --target $env:GITHUB_SHA --draft --title "拾贴 ClipNest $version" --notes-file build/release-notes.md @files
+          if ($LASTEXITCODE) { throw 'Draft release or asset upload failed' }
+          gh release edit "v$version" --draft=false
+          if ($LASTEXITCODE) { throw 'Publishing release failed' }

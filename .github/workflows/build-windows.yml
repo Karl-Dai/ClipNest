@@ -23,4 +23,9 @@ jobs:
           path: |
             dist/*.zip
             dist/*.sha256
+            dist/*Setup-x64.exe
+            dist/*.nupkg
+            dist/releases.win.json
+            dist/RELEASES
+            dist/SHA256SUMS-*.txt
           if-no-files-found: error

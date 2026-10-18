@@ -40,6 +40,7 @@
 | 可选数据位置 | 选择空文件夹，自动迁移历史、收藏、图片与设置，并保留原目录备份 |
 | 原生外观 | WinUI 3、Acrylic 背景、浅色 / 深色 / 跟随系统 |
 | 托盘常驻 | 收起后继续记录；支持暂停记录和登录 Windows 时启动 |
+| 安装与更新 | 桌面 / 开始菜单快捷方式；安装版自动检查并下载稳定版更新 |
 
 ### 支持的内容
 
@@ -57,21 +58,32 @@
 
 **运行要求：Windows 11 22H2 或更高版本，x64。**
 
-1. 打开 [Releases](https://github.com/Karl-Dai/ClipNest/releases/latest)，下载 `ClipNest-版本号-win-x64.zip`。
-2. 将整个 ZIP 解压到一个固定文件夹。
-3. 打开其中的 `ClipNest/ClipNest.exe`，开始复制内容。
+| 版本 | 发布页中的文件 | 适合谁 |
+| --- | --- | --- |
+| **安装版（推荐）** | `ClipNest-版本号-Setup-x64.exe` | 希望使用桌面快捷方式和自动更新 |
+| 便携版 | `ClipNest-版本号-win-x64.zip` | 希望解压后运行、手动管理程序文件 |
+
+**安装版：** 打开 [Releases](https://github.com/Karl-Dai/ClipNest/releases/latest)，下载 `Setup-x64.exe` 并运行。安装到当前用户目录 `%LOCALAPPDATA%\ClipNest.Windows`，自动创建“拾贴 ClipNest”桌面及开始菜单快捷方式，可从 Windows 已安装的应用中卸载。
+
+**便携版：** 下载 ZIP，完整解压到固定文件夹，再运行其中的 `ClipNest/ClipNest.exe`。
 
 便携包包含 .NET 与 Windows App SDK 运行时，无需另外安装。请保留程序同目录下的 DLL、资源和子文件夹；不要只取出 EXE 单独运行。
 
 可使用发布页的 `.sha256` 文件校验下载：
 
 ```powershell
-Get-FileHash .\ClipNest-0.3.1-win-x64.zip -Algorithm SHA256
+Get-FileHash .\ClipNest-0.4.0-Setup-x64.exe -Algorithm SHA256
 ```
 
 ### 更新版本
 
-从托盘菜单退出拾贴，将新版解压到新文件夹后运行。数据默认保存在程序文件夹之外，正常更新会继续读取原有历史。若启用了登录启动，移动程序位置后请在设置中关闭再启用一次。
+**安装版**启动约 15 秒后检查更新，之后每 6 小时自动检查一次。发现新稳定版后在后台下载并校验，下次启动自动应用；也可点击“重启更新”立即生效。设置中提供“检查更新”和自动检查开关，网络失败可稍后重试，不影响剪贴板使用。
+
+**便携版**从托盘菜单退出后，解压新版并运行。便携版不会自动替换自身，也可运行安装包切换到安装版，默认历史仍从原数据目录读取。若启用了登录启动，移动便携版程序位置后请在设置中关闭再启用一次。
+
+数据默认保存在程序文件夹之外。更新与卸载安装版会保留独立数据目录；请不要将数据放入程序安装文件夹。关闭自动检查后不再自动检查或下载，已经下载完成的更新仍会在下次启动时应用。
+
+安装与更新由 [Velopack](https://docs.velopack.io/integrating/overview) 管理，更新源为本仓库的公开 GitHub Releases。发布页中的 `.nupkg`、`releases.win.json`、`RELEASES` 是更新组件需要的文件，普通用户下载安装程序即可。当前安装包未进行代码签名，可用发布页的 SHA256 校验文件核对下载。
 
 ## 使用指南
 
@@ -114,7 +126,7 @@ Get-FileHash .\ClipNest-0.3.1-win-x64.zip -Algorithm SHA256
 
 ## 数据与隐私
 
-拾贴的剪贴板历史保存在本机，应用不提供云端上传、账户登录或同步功能。**本地数据库和图片文件未加密**，请像其他个人文件一样妥善管理。
+拾贴的剪贴板历史保存在本机，应用不提供剪贴板云端上传、账户登录或同步功能。安装版会联网向 GitHub 查询版本和下载安装更新包，不发送剪贴板记录。**本地数据库和图片文件未加密**，请像其他个人文件一样妥善管理。
 
 默认数据目录：
 
@@ -182,7 +194,7 @@ dotnet run --project src/ClipNest.App
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1
 ```
 
-构建输出位于 `dist/`。GitHub Actions 也会执行构建、测试及打包，可从 [工作流页面](https://github.com/Karl-Dai/ClipNest/actions) 下载构建产物。
+构建输出位于 `dist/`，包括安装包、便携包、更新包、更新清单及 SHA256 校验文件。打包脚本会恢复 `.config/dotnet-tools.json` 中固定版本的 Velopack CLI；传入 `-SkipInstaller` 可仅生成便携包。GitHub Actions 也会执行构建、测试及打包，可从 [工作流页面](https://github.com/Karl-Dai/ClipNest/actions) 下载构建产物。更新机制与发布步骤见 [安装与更新文档](docs/updates.md)。
 
 ```text
 src/ClipNest.App/         WinUI 3 界面、托盘、快捷键与设置
@@ -198,7 +210,7 @@ docs/                    产品演示与上游设计文档
 
 ## 更新记录
 
-完整记录见 [CHANGELOG.md](CHANGELOG.md)。**0.3.1** 将快捷键设置改为直接按组合键录入，保留冲突检查、Esc 撤销和恢复默认；**0.3.0** 加入数据目录迁移与可配置快捷键。
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。**0.4.0** 新增安装包、桌面 / 开始菜单快捷方式和 GitHub 自动更新；**0.3.1** 将快捷键改为直接按键录入；**0.3.0** 加入数据目录迁移。
 
 ## 来源与致谢
 

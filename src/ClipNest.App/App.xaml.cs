@@ -35,6 +35,7 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (System.Environment.GetCommandLineArgs().Contains("--quit", StringComparer.Ordinal)) { Exit(); return; }
         _host = HostBuilderExtensions.BuildAppHost();
         // Start synchronously so future IHostedService workers (P1+ clipboard
         // monitor, hotkey listener, etc.) actually run.
@@ -43,6 +44,8 @@ public partial class App : Application
         _logger.LogInformation("App starting (pid={Pid})", System.Environment.ProcessId);
 
         _mainWindow = new MainWindow();
+        if (_mainWindow.Updates.IsInstalled && StartupRegistration.IsEnabled)
+            StartupRegistration.SetEnabled(true); // Keep an existing startup preference at the stable installed path.
         if (!System.Environment.GetCommandLineArgs().Contains("--background", StringComparer.Ordinal))
             _mainWindow.ShowHistory();
 
@@ -69,6 +72,8 @@ public partial class App : Application
         // Marshal to UI thread, show + bring to front.
         _mainWindow.DispatcherQueue.TryEnqueue(() =>
         {
+            if (e.Data is Windows.ApplicationModel.Activation.ILaunchActivatedEventArgs launch
+                && (launch.Arguments.Trim() == "--quit" || launch.Arguments.TrimEnd().EndsWith(" --quit", StringComparison.Ordinal))) { Shutdown(); return; }
             _logger?.LogInformation("Secondary instance activation redirected; surfacing window");
             _mainWindow.ShowHistory();
         });

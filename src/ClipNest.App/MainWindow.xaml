@@ -77,6 +77,7 @@
             </Border>
         <StackPanel Grid.Row="3" Margin="16,8,16,0" Spacing="8">
             <InfoBar x:Name="FeedbackBar" IsOpen="False" IsClosable="True" Severity="Informational"/>
+            <InfoBar x:Name="UpdateBar" IsOpen="False" IsClosable="True" Severity="Success" Title="更新已就绪"><InfoBar.ActionButton><Button Content="重启更新" Click="OnRestartUpdateClicked"/></InfoBar.ActionButton></InfoBar>
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="6" x:Name="ActionButtons">

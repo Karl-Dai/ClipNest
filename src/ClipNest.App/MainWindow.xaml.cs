@@ -31,6 +31,9 @@ public sealed partial class MainWindow : Window, IDisposable
     private bool _ready;
     private bool _busy;
     private Action<HotkeySetting>? _recordHotkey;
+    private TextBlock? _updateStatusText;
+    private Button? _checkUpdatesButton;
+    internal AppUpdates Updates { get; }
     private bool _previewRequested = true;
     private readonly UiPreferences _appearance;
     private IReadOnlyList<ClipboardEntry> _lastEntries = Array.Empty<ClipboardEntry>();
@@ -45,6 +48,8 @@ public sealed partial class MainWindow : Window, IDisposable
         _capture = App.Services.GetRequiredService<ClipboardCaptureService>();
         InitializeComponent();
         _appearance = UiPreferences.Load(_paths.Root);
+        Updates = new AppUpdates { Automatic = _appearance.AutomaticUpdates };
+        Updates.Changed += OnUpdatesChanged;
         if (_appearance.LayoutVersion < 2)
         {
             _appearance.ShowPreview = true;
@@ -96,6 +101,7 @@ public sealed partial class MainWindow : Window, IDisposable
         if (!_desktop.HotkeyRegistered)
             HotkeyHint.Text = "快捷键已被占用 · 请通过托盘打开";
         if (Hosting.HostBuilderExtensions.StartupWarning is { } warning) ShowStatus(warning);
+        Updates.Start();
     }
 
     public void ShowHistory()
@@ -118,11 +124,27 @@ public sealed partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        Updates.Changed -= OnUpdatesChanged;
+        Updates.Dispose();
         _timer.Stop();
         _desktop.Dispose();
     }
 
     private void Hide() => AppWindow.Hide();
+    private void OnUpdatesChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        UpdateBar.IsOpen = Updates.Ready;
+        UpdateBar.Message = Updates.Status;
+        if (_updateStatusText is not null) _updateStatusText.Text = Updates.Status;
+        if (_checkUpdatesButton is not null) _checkUpdatesButton.Content = Updates.Ready ? "重启更新" : Updates.IsInstalled ? "检查更新" : "下载安装版";
+    });
+
+    private void RestartForUpdate()
+    {
+        try { Updates.PrepareRestart(); ((App)Application.Current).Shutdown(); }
+        catch (Exception ex) { ShowError(ex); }
+    }
+    private void OnRestartUpdateClicked(object sender, RoutedEventArgs e) { if (!_busy) RestartForUpdate(); }
     private void UpdateHotkeyHint() => HotkeyHint.Text = _desktop.HotkeyRegistered
         ? _desktop.Hotkey.Label + " 唤出" : "快捷键被占用 · 通过托盘打开";
     private void OnDismissClicked(object sender, RoutedEventArgs e) { if (!_busy) Hide(); }
@@ -374,6 +396,15 @@ public sealed partial class MainWindow : Window, IDisposable
         {
             var limit = new NumberBox { Header = "历史记录上限（收藏不计入）", Minimum = 10, Maximum = 10000, Value = _settings.GetHistoryLimit(), SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
             var startup = new CheckBox { Content = "登录 Windows 时启动", IsChecked = StartupRegistration.IsEnabled };
+            var automaticUpdates = new CheckBox { Content = "自动检查并下载更新（每 6 小时）", IsChecked = _appearance.AutomaticUpdates, IsEnabled = Updates.IsInstalled };
+            _updateStatusText = new TextBlock { Text = Updates.Status, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+            _checkUpdatesButton = new Button { Content = Updates.Ready ? "重启更新" : Updates.IsInstalled ? "检查更新" : "下载安装版" };
+            _checkUpdatesButton.Click += async (_, _) =>
+            {
+                if (!Updates.IsInstalled) await Windows.System.Launcher.LaunchUriAsync(new Uri(AppUpdates.ReleasesUrl));
+                else if (Updates.Ready) RestartForUpdate();
+                else await Updates.CheckAsync();
+            };
             var panel = new StackPanel { Spacing = 16, MinWidth = 300, MaxWidth = 440 };
             var theme = new ComboBox { Header = "外观", ItemsSource = new[] { "跟随系统", "浅色", "深色" }, SelectedIndex = (int)Root.RequestedTheme, HorizontalAlignment = HorizontalAlignment.Stretch };
             var candidate = _desktop.Hotkey;
@@ -440,6 +471,8 @@ public sealed partial class MainWindow : Window, IDisposable
             };
             panel.Children.Add(shortcut); panel.Children.Add(location); panel.Children.Add(browse); panel.Children.Add(locationHint);
             panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup);
+            panel.Children.Add(new TextBlock { Text = $"拾贴 {Updates.Version} · {(Updates.IsInstalled ? "安装版" : "便携版")}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+            panel.Children.Add(automaticUpdates); panel.Children.Add(_updateStatusText); panel.Children.Add(_checkUpdatesButton);
             var scroll = new ScrollViewer { Content = panel, MaxHeight = Math.Max(180, Root.ActualHeight - 210), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var content = new StackPanel { Spacing = 8 };
             content.Children.Add(error); content.Children.Add(scroll);
@@ -454,6 +487,10 @@ public sealed partial class MainWindow : Window, IDisposable
                     if (newLocation is not null)
                     {
                         DataDirectoryMigration.ValidateTarget(_paths.Root, newLocation);
+                        var appRoot = Updates.InstallationRoot ?? AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+                        if (DataDirectoryMigration.SameLocation(newLocation, appRoot)
+                            || newLocation.StartsWith(appRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                            throw new IOException("数据目录必须位于程序安装文件夹之外，以便更新和卸载时保留数据。");
                         var configFolder = Path.GetDirectoryName(Hosting.HostBuilderExtensions.LocationFile)!;
                         if (DataDirectoryMigration.SameLocation(newLocation, configFolder)
                             || configFolder.StartsWith(newLocation + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
@@ -467,18 +504,21 @@ public sealed partial class MainWindow : Window, IDisposable
                     {
                         var oldHotkey = _appearance.Hotkey;
                         var oldTheme = _appearance.Theme;
+                        var oldAutomatic = _appearance.AutomaticUpdates;
                         try
                         {
                             _appearance.Hotkey = candidate;
                             _appearance.Theme = (ElementTheme)theme.SelectedIndex;
+                            _appearance.AutomaticUpdates = automaticUpdates.IsChecked == true;
                             _appearance.Save(_paths.Root);
                         }
-                        catch { _appearance.Hotkey = oldHotkey; _appearance.Theme = oldTheme; throw; }
+                        catch { _appearance.Hotkey = oldHotkey; _appearance.Theme = oldTheme; _appearance.AutomaticUpdates = oldAutomatic; throw; }
                     });
                     UpdateHotkeyHint();
                     _settings.SetHistoryLimit((int)limit.Value);
                     if (StartupRegistration.IsEnabled != (startup.IsChecked == true)) StartupRegistration.SetEnabled(startup.IsChecked == true);
                     Root.RequestedTheme = _appearance.Theme;
+                    Updates.Automatic = _appearance.AutomaticUpdates;
                 }
                 catch (Exception ex) { args.Cancel = true; error.Message = ex.Message; error.IsOpen = true; }
             };
@@ -503,7 +543,7 @@ public sealed partial class MainWindow : Window, IDisposable
             }
         }
         catch (Exception ex) { ShowError(ex); }
-        finally { _recordHotkey = null; _busy = false; }
+        finally { _recordHotkey = null; _updateStatusText = null; _checkUpdatesButton = null; _busy = false; }
     }
 
     private static uint ReadHotkeyModifiers()

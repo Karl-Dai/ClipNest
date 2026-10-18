@@ -12,6 +12,8 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        // Installer/update hooks must run before WinRT, single-instance registration, or UI.
+        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(true).Run();
         if (args.Length == 2 && args[0] == "--wait-for-exit" && int.TryParse(args[1], out var previousId))
         {
             try
