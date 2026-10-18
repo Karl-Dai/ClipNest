@@ -41,7 +41,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1 -Versi
 
 手动运行 `release.yml` 工作流并输入版本号时，会构建全部产物，先上传到草稿再发布。
 发布前更新 `Directory.Build.props`、应用清单、`build/package.ps1` 默认版本、发布说明及更新记录。
-版本必须递增，不覆盖已发布版本的更新包。安装程序当前未代码签名；加入签名时应通过受保护的 CI 机密配置签名服务。
+版本必须递增，不覆盖已发布版本的更新包。已发布的 0.4.0 安装程序仍未代码签名。
+手动发布工作流现在要求签名，缺少证书时会在构建前终止，不会降级发布未签名包。
+证书申请、签名构建和当前限制见 [代码签名](signing.md)。
 
 ## 测试
 

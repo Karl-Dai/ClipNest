@@ -20,9 +20,12 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          CLIPNEST_SIGN_CERT_THUMBPRINT: ${{ vars.CLIPNEST_SIGN_CERT_THUMBPRINT }}
         run: |
           if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Expected a stable SemVer version' }
-          ./build/package.ps1 -Version $env:RELEASE_VERSION
+          # A signing provider must expose its certificate/private-key provider on this runner.
+          # Refuse unsigned public releases while publisher identity is being provisioned.
+          ./build/package.ps1 -Version $env:RELEASE_VERSION -RequireSignature
       - name: Upload assets to draft, then publish
         shell: pwsh
         env:

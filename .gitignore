@@ -11,3 +11,6 @@
 *.tmp
 dist/
 .dev-tools/
+*.pfx
+*.p12
+*.key
