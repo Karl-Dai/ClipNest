@@ -31,6 +31,14 @@ public sealed class ClipNestDatabase
         _connectionString = new SqliteConnectionStringBuilder { DataSource = databaseFilePath }.ToString();
 
         using var conn = Open();
+        // Readers must not hold up clipboard writes while searching long histories.
+        // WAL requires local shared-memory locking; keep the original mode for UNC data paths.
+        if (!databaseFilePath.StartsWith(@"\\", StringComparison.Ordinal))
+        {
+            using var mode = conn.CreateCommand();
+            mode.CommandText = "PRAGMA journal_mode = WAL;";
+            mode.ExecuteScalar();
+        }
         ClipboardSchema.EnsureCreated(conn);
     }
 

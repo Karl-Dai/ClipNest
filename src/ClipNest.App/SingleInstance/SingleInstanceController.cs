@@ -20,7 +20,15 @@ internal static class SingleInstanceController
 
     public static async Task<InstanceClaim> ClaimOrRedirectAsync(AppActivationArguments activationArgs)
     {
-        var primary = AppInstance.FindOrRegisterForKey(InstanceKey);
+        var key = InstanceKey;
+#if CLIPNEST_DIAGNOSTICS
+        if (System.Environment.GetCommandLineArgs().Any(argument => argument is "--diagnostics" or "--diagnostics-ui"))
+        {
+            var root = System.Environment.GetEnvironmentVariable("CLIPNEST_DATA_ROOT") ?? string.Empty;
+            key += ".Diagnostics." + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(root.ToUpperInvariant())))[..16];
+        }
+#endif
+        var primary = AppInstance.FindOrRegisterForKey(key);
         if (primary.IsCurrent)
         {
             return new InstanceClaim(IsPrimary: true, Primary: primary);

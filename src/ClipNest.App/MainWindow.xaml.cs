@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
@@ -36,8 +36,7 @@ public sealed partial class MainWindow : Window, IDisposable
     internal AppUpdates Updates { get; }
     private bool _previewRequested = true;
     private readonly UiPreferences _appearance;
-    private IReadOnlyList<ClipboardEntry> _lastEntries = Array.Empty<ClipboardEntry>();
-    private ClipboardEntry? Selected => (HistoryList.SelectedItem as HistoryRow)?.Entry;
+    private ClipboardEntry? Selected => _selectedEntry?.Id == (HistoryList.SelectedItem as HistoryRow)?.Entry.Id ? _selectedEntry : null;
 
     public MainWindow()
     {
@@ -47,6 +46,8 @@ public sealed partial class MainWindow : Window, IDisposable
         _settings = App.Services.GetRequiredService<IAppSettingsStore>();
         _capture = App.Services.GetRequiredService<ClipboardCaptureService>();
         InitializeComponent();
+        HistoryList.ItemsSource = _rows;
+        HistoryList.Loaded += OnHistoryListLoaded;
         _appearance = UiPreferences.Load(_paths.Root);
         Updates = new AppUpdates { Automatic = _appearance.AutomaticUpdates };
         Updates.Changed += OnUpdatesChanged;
@@ -76,11 +77,16 @@ public sealed partial class MainWindow : Window, IDisposable
         Activated += (_, e) =>
         {
             if (e.WindowActivationState == WindowActivationState.Deactivated)
+            {
+#if CLIPNEST_DIAGNOSTICS
+                if (System.Environment.GetCommandLineArgs().Any(argument => argument is "--diagnostics" or "--diagnostics-ui")) return;
+#endif
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     // Owned flyouts and settings must not dismiss the panel.
                     if (!_busy && !DesktopIntegration.IsAppForeground && AppWindow.IsVisible) Hide();
                 });
+            }
         };
         _desktop.ToggleRequested += (_, _) =>
         {
@@ -93,7 +99,7 @@ public sealed partial class MainWindow : Window, IDisposable
         AppWindow.Closing += (_, args) => { args.Cancel = true; Hide(); };
         _timer = DispatcherQueue.CreateTimer();
         _timer.Interval = TimeSpan.FromSeconds(1);
-        _timer.Tick += (_, _) => { if (AppWindow.IsVisible && !_busy) Refresh(); };
+        _timer.Tick += (_, _) => { if (AppWindow.IsVisible && !_busy && !_queryPending) Refresh(); };
         _timer.Start();
         _ready = true;
         ApplyLayout();
@@ -124,6 +130,11 @@ public sealed partial class MainWindow : Window, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        _queryCancellation?.Cancel();
+        _previewCancellation?.Cancel();
+        _previewCache.Clear();
+        HistoryRow.ClearThumbnails();
         Updates.Changed -= OnUpdatesChanged;
         Updates.Dispose();
         _timer.Stop();
@@ -200,65 +211,6 @@ public sealed partial class MainWindow : Window, IDisposable
         ApplyLayout();
     }
 
-    private void Refresh(bool force = false)
-    {
-        if (!_ready) return;
-        try
-        {
-            var kind = (KindFilter.SelectedItem as ComboBoxItem)?.Tag as string;
-            var entries = _store.Search(SearchBox.Text, HistoryFilter.SelectedItem == SavedFilter, string.IsNullOrEmpty(kind) ? null : kind);
-            if (!force && _lastEntries.SequenceEqual(entries)) return;
-            var selected = Selected?.Id;
-            _lastEntries = entries;
-            var rows = entries.Select(e => new HistoryRow(e, _paths.Blobs)).ToList();
-            HistoryList.ItemsSource = rows;
-            HistoryList.SelectedItem = rows.FirstOrDefault(r => r.Entry.Id == selected) ?? rows.FirstOrDefault();
-            EmptyState.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            var unfiltered = string.IsNullOrWhiteSpace(SearchBox.Text) && HistoryFilter.SelectedItem != SavedFilter && string.IsNullOrEmpty(kind);
-            EmptyTitle.Text = unfiltered ? "从一次复制开始" : "没有找到匹配的内容";
-            EmptyHint.Text = unfiltered ? "复制文字、图片或文件，拾贴会替你记住。" : "试试其他关键词，或切换到「最近 / 所有类型」。";
-            foreach (var button in ActionButtons.Children.OfType<Button>()) button.IsEnabled = rows.Count > 0;
-            if (rows.Count == 0) UpdatePreview();
-            StatusText.Text = $"{(_capture.IsPaused ? "已暂停" : "正在记录")} · {rows.Count} 条 · 仅本机";
-        }
-        catch (Exception ex) { ShowError(ex); }
-    }
-
-    private void UpdatePreview()
-    {
-        var entry = Selected;
-        PreviewImage.Source = null;
-        ImageScroll.Visibility = Visibility.Collapsed;
-        RtfPreview.Visibility = Visibility.Collapsed;
-        TextScroll.Visibility = Visibility.Visible;
-        PreviewTitle.Text = entry is null ? "内容预览" : HistoryRow.KindName(entry.Kind);
-        PreviewMeta.Text = entry is null ? "选择左侧记录查看详情" : $"{entry.SourceApp ?? "未知应用"}  ·  {entry.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm:ss}";
-        PreviewText.Text = entry?.Content ?? string.Empty;
-        FavoriteIcon.Glyph = entry?.IsFavorite == true ? "\uE735" : "\uE734";
-        var favoriteLabel = entry?.IsFavorite == true ? "取消收藏" : "收藏";
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(FavoriteButton, favoriteLabel);
-        ToolTipService.SetToolTip(FavoriteButton, favoriteLabel);
-        if (entry is null) return;
-        try
-        {
-            if (entry.Kind == ClipboardKind.Image && entry.BlobPath is not null)
-            {
-                var path = BlobFile(entry);
-                if (!File.Exists(path)) { PreviewText.Text = "图片文件已丢失，可删除这条记录。"; return; }
-                PreviewImage.Source = new BitmapImage(new Uri(path));
-                TextScroll.Visibility = Visibility.Collapsed;
-                ImageScroll.Visibility = Visibility.Visible;
-            }
-            else if (entry.Kind == ClipboardKind.Rtf)
-            {
-                RtfPreview.Document.SetText(TextSetOptions.FormatRtf, entry.Content ?? string.Empty);
-                TextScroll.Visibility = Visibility.Collapsed;
-                RtfPreview.Visibility = Visibility.Visible;
-            }
-        }
-        catch (Exception ex) { ShowError(ex); }
-    }
-
     private string BlobFile(ClipboardEntry entry) => Path.Combine(_paths.Blobs, Path.GetFileName(entry.BlobPath!));
     private void ShowStatus(string message)
     {
@@ -275,10 +227,15 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private async Task CopyOrPasteAsync(bool paste)
     {
-        if (_busy || Selected is not { } entry) return;
+        if (_busy) return;
+        await _refreshTask;
+        if (_busy || _queryPending) return;
+        if ((HistoryList.SelectedItem as HistoryRow)?.Entry is not { } summary) return;
         _busy = true;
         try
         {
+            var entry = Selected ?? await Task.Run(() => _store.GetById(summary.Id));
+            if (entry is null) { ShowStatus("这条记录已被移除，请重新选择。"); Refresh(true); return; }
             var package = new DataPackage { RequestedOperation = DataPackageOperation.Copy };
             switch (entry.Kind)
             {
@@ -297,7 +254,9 @@ public sealed partial class MainWindow : Window, IDisposable
                     break;
                 case ClipboardKind.Rtf:
                     package.SetRtf(entry.Content ?? string.Empty);
-                    RtfPreview.Document.GetText(TextGetOptions.None, out var plain);
+                    var richText = new RichEditBox();
+                    richText.Document.SetText(TextSetOptions.FormatRtf, entry.Content ?? string.Empty);
+                    richText.Document.GetText(TextGetOptions.None, out var plain);
                     package.SetText(plain.TrimEnd('\r'));
                     break;
                 default: package.SetText(entry.Content ?? string.Empty); break;
@@ -324,10 +283,10 @@ public sealed partial class MainWindow : Window, IDisposable
         finally { _busy = false; }
     }
 
-    private void OnSearchChanged(object sender, TextChangedEventArgs e) => Refresh();
+    private void OnSearchChanged(object sender, TextChangedEventArgs e) => _refreshTask = RefreshAsync(true, debounce: true);
     private void OnHistoryFilterChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args) => Refresh(true);
     private void OnKindChanged(object sender, SelectionChangedEventArgs e) => Refresh(true);
-    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) => UpdatePreview();
+    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e) { if (!_applyingRows) UpdatePreview(); }
     private async void OnPasteClicked(object sender, RoutedEventArgs e) => await CopyOrPasteAsync(true);
     private async void OnCopyClicked(object sender, RoutedEventArgs e) => await CopyOrPasteAsync(false);
     private async void OnItemDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
@@ -375,8 +334,10 @@ public sealed partial class MainWindow : Window, IDisposable
     }
     private async void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        await _refreshTask;
         if (e.Key is VirtualKey.Down or VirtualKey.Up && HistoryList.Items.Count > 0)
         {
+            if (e.Key == VirtualKey.Down && HistoryList.SelectedIndex == _rows.Count - 1) await LoadMoreAsync();
             var next = HistoryList.SelectedIndex + (e.Key == VirtualKey.Down ? 1 : -1);
             HistoryList.SelectedIndex = Math.Clamp(next, 0, HistoryList.Items.Count - 1);
             HistoryList.ScrollIntoView(HistoryList.SelectedItem);
@@ -387,6 +348,14 @@ public sealed partial class MainWindow : Window, IDisposable
     private async void OnListKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Enter) { e.Handled = true; await CopyOrPasteAsync(true); }
+        else if (e.Key == VirtualKey.Down && HistoryList.SelectedIndex == _rows.Count - 1 && _rows.Count < _totalEntries)
+        {
+            e.Handled = true;
+            var next = HistoryList.SelectedIndex + 1;
+            await LoadMoreAsync();
+            HistoryList.SelectedIndex = Math.Min(next, _rows.Count - 1);
+            HistoryList.ScrollIntoView(HistoryList.SelectedItem);
+        }
     }
     private async void OnSettingsClicked(object sender, RoutedEventArgs e)
     {
@@ -394,7 +363,8 @@ public sealed partial class MainWindow : Window, IDisposable
         _busy = true;
         try
         {
-            var limit = new NumberBox { Header = "历史记录上限（收藏不计入）", Minimum = 10, Maximum = 10000, Value = _settings.GetHistoryLimit(), SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
+            var initialLimit = _settings.GetHistoryLimit();
+            var limit = new NumberBox { Header = "历史记录上限（收藏不计入）", Minimum = 10, Maximum = 10000, Value = initialLimit, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
             var startup = new CheckBox { Content = "登录 Windows 时启动", IsChecked = StartupRegistration.IsEnabled };
             var automaticUpdates = new CheckBox { Content = "自动检查并下载更新（每 6 小时）", IsChecked = _appearance.AutomaticUpdates, IsEnabled = Updates.IsInstalled };
             _updateStatusText = new TextBlock { Text = Updates.Status, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
@@ -470,7 +440,9 @@ public sealed partial class MainWindow : Window, IDisposable
                 catch (Exception ex) { error.Message = "无法打开文件夹选择器，也可以直接填写路径。" + ex.Message; error.IsOpen = true; }
             };
             panel.Children.Add(shortcut); panel.Children.Add(location); panel.Children.Add(browse); panel.Children.Add(locationHint);
-            panel.Children.Add(theme); panel.Children.Add(limit); panel.Children.Add(startup);
+            panel.Children.Add(theme); panel.Children.Add(limit);
+            panel.Children.Add(new TextBlock { Text = "降低上限并保存，会立即删除超出的较旧普通记录和图片；收藏保留。", TextWrapping = TextWrapping.Wrap, FontSize = 12 });
+            panel.Children.Add(startup);
             panel.Children.Add(new TextBlock { Text = $"拾贴 {Updates.Version} · {(Updates.IsInstalled ? "安装版" : "便携版")}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
             panel.Children.Add(automaticUpdates); panel.Children.Add(_updateStatusText); panel.Children.Add(_checkUpdatesButton);
             var scroll = new ScrollViewer { Content = panel, MaxHeight = Math.Max(180, Root.ActualHeight - 210), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -478,6 +450,12 @@ public sealed partial class MainWindow : Window, IDisposable
             content.Children.Add(error); content.Children.Add(scroll);
             string? newLocation = null;
             var dialog = new ContentDialog { Title = "设置", Content = content, PrimaryButtonText = "保存", SecondaryButtonText = "清理历史", CloseButtonText = "取消", DefaultButton = ContentDialogButton.Primary, XamlRoot = Root.XamlRoot, RequestedTheme = Root.ActualTheme };
+            limit.ValueChanged += (_, _) =>
+            {
+                var reducing = double.IsFinite(limit.Value) && limit.Value < initialLimit;
+                dialog.PrimaryButtonText = reducing ? "保存并清理" : "保存";
+                dialog.DefaultButton = reducing ? ContentDialogButton.Close : ContentDialogButton.Primary;
+            };
             dialog.PrimaryButtonClick += (_, args) =>
             {
                 try
@@ -515,7 +493,6 @@ public sealed partial class MainWindow : Window, IDisposable
                         catch { _appearance.Hotkey = oldHotkey; _appearance.Theme = oldTheme; _appearance.AutomaticUpdates = oldAutomatic; throw; }
                     });
                     UpdateHotkeyHint();
-                    _settings.SetHistoryLimit((int)limit.Value);
                     if (StartupRegistration.IsEnabled != (startup.IsChecked == true)) StartupRegistration.SetEnabled(startup.IsChecked == true);
                     Root.RequestedTheme = _appearance.Theme;
                     Updates.Automatic = _appearance.AutomaticUpdates;
@@ -525,6 +502,12 @@ public sealed partial class MainWindow : Window, IDisposable
             var result = await dialog.ShowAsync();
             if (result == ContentDialogResult.Primary)
             {
+                var savedLimit = (int)limit.Value;
+                await Task.Run(() =>
+                {
+                    foreach (var blob in _store.SetHistoryLimitAndTrim(savedLimit)) _blobs.Delete(blob);
+                });
+                Refresh(true);
                 if (newLocation is not null)
                 {
                     ShowStatus("正在迁移数据，完成后将自动重启…");
@@ -558,27 +541,39 @@ public sealed partial class MainWindow : Window, IDisposable
 
 public sealed class HistoryRow
 {
-    public ClipboardEntry Entry { get; }
-    public BitmapImage? Thumbnail { get; }
+    private static readonly BoundedCache<string, BitmapImage> Thumbnails = new(48);
+    private readonly string? _imagePath;
+    public ClipboardEntrySummary Entry { get; }
+    public BitmapImage? Thumbnail
+    {
+        get
+        {
+            if (_imagePath is null || !File.Exists(_imagePath)) return null;
+            if (Thumbnails.TryGet(_imagePath, out var image)) return image;
+            image = new BitmapImage { DecodePixelWidth = 88, DecodePixelHeight = 88, UriSource = new Uri(_imagePath) };
+            Thumbnails.Add(_imagePath, image);
+            return image;
+        }
+    }
+    internal static void ClearThumbnails() => Thumbnails.Clear();
     public Visibility ThumbnailVisibility => Thumbnail is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility FavoriteVisibility => Entry.IsFavorite ? Visibility.Visible : Visibility.Collapsed;
     public string Glyph => Entry.Kind switch
     { ClipboardKind.Image => "\uEB9F", ClipboardKind.File => "\uE8A5", ClipboardKind.Color => "\uE790", ClipboardKind.Rtf => "\uE8D2", _ => "\uE8A4" };
-    public HistoryRow(ClipboardEntry entry, string blobs)
+    public HistoryRow(ClipboardEntrySummary entry, string blobs)
     {
         ArgumentNullException.ThrowIfNull(entry);
         Entry = entry;
         if (entry.Kind == ClipboardKind.Image && entry.BlobPath is not null)
         {
-            var path = Path.Combine(blobs, Path.GetFileName(entry.BlobPath));
-            if (File.Exists(path)) Thumbnail = new BitmapImage { DecodePixelWidth = 88, UriSource = new Uri(path) };
+            _imagePath = Path.Combine(blobs, Path.GetFileName(entry.BlobPath));
         }
     }
     public string Title => Entry.Kind switch
     {
         ClipboardKind.Image => "图片",
         ClipboardKind.Rtf => "富文本",
-        _ => (Entry.Content ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ') is var text && text.Length > 160 ? text[..160] + "…" : text,
+        _ => (Entry.PreviewText ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ') is var text && text.Length > 160 ? text[..160] + "…" : text,
     };
     public string Subtitle => $"{KindName(Entry.Kind)}  ·  {Entry.SourceApp ?? "未知来源"}  ·  {Entry.CreatedAt.ToLocalTime().ToString("MM-dd HH:mm", CultureInfo.CurrentCulture)}";
     public static string KindName(ClipboardKind kind) => kind switch

@@ -36,6 +36,11 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         if (System.Environment.GetCommandLineArgs().Contains("--quit", StringComparer.Ordinal)) { Exit(); return; }
+#if CLIPNEST_DIAGNOSTICS
+        if (System.Environment.GetCommandLineArgs().Any(argument => argument is "--diagnostics" or "--diagnostics-ui")
+            && string.IsNullOrWhiteSpace(System.Environment.GetEnvironmentVariable("CLIPNEST_DATA_ROOT")))
+            throw new InvalidOperationException("Diagnostics require an isolated CLIPNEST_DATA_ROOT.");
+#endif
         _host = HostBuilderExtensions.BuildAppHost();
         // Start synchronously so future IHostedService workers (P1+ clipboard
         // monitor, hotkey listener, etc.) actually run.
@@ -49,6 +54,13 @@ public partial class App : Application
         if (!System.Environment.GetCommandLineArgs().Contains("--background", StringComparer.Ordinal))
             _mainWindow.ShowHistory();
 
+#if CLIPNEST_DIAGNOSTICS
+        if (System.Environment.GetCommandLineArgs().Contains("--diagnostics", StringComparer.Ordinal))
+        {
+            _ = _mainWindow.RunDiagnosticsAsync();
+            return;
+        }
+#endif
         _tray = new TrayIconHost();
         _tray.ShowRequested += (_, _) =>
         {

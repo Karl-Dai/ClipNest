@@ -58,4 +58,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <PropertyGroup Condition="'$(ClipNestDiagnostics)' == 'true'">
+    <DefineConstants>$(DefineConstants);CLIPNEST_DIAGNOSTICS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(ClipNestDiagnostics)' != 'true'">
+    <Compile Remove="Diagnostics\**\*.cs" />
+  </ItemGroup>
 </Project>

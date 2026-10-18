@@ -1,0 +1,348 @@
+{
+  "TimestampUtc": "2026-10-18T22:02:19.4702329+08:00",
+  "Framework": ".NET 8.0.31",
+  "Results": [
+    {
+      "Scenario": "normal-100",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.237,
+      "P95Ms": 0.308,
+      "MaxMs": 0.346,
+      "AllocatedBytesPerCall": 145600
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.133,
+      "P95Ms": 0.226,
+      "MaxMs": 0.227,
+      "AllocatedBytesPerCall": 2608
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 0.123,
+      "P95Ms": 0.147,
+      "MaxMs": 0.165,
+      "AllocatedBytesPerCall": 4072
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 10,
+      "MedianMs": 0.082,
+      "P95Ms": 0.102,
+      "MaxMs": 0.128,
+      "AllocatedBytesPerCall": 17016
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 7.029,
+      "P95Ms": 7.14,
+      "MaxMs": 7.886,
+      "AllocatedBytesPerCall": 8567
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 110
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 0.771,
+      "P95Ms": 1.011,
+      "MaxMs": 2.079,
+      "AllocatedBytesPerCall": 719035
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.688,
+      "P95Ms": 0.697,
+      "MaxMs": 0.711,
+      "AllocatedBytesPerCall": 2608
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 0.693,
+      "P95Ms": 0.709,
+      "MaxMs": 0.716,
+      "AllocatedBytesPerCall": 4072
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.273,
+      "P95Ms": 0.384,
+      "MaxMs": 0.447,
+      "AllocatedBytesPerCall": 146320
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 7.086,
+      "P95Ms": 8.094,
+      "MaxMs": 8.094,
+      "AllocatedBytesPerCall": 7624
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 1028
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 1.348,
+      "P95Ms": 1.593,
+      "MaxMs": 1.635,
+      "AllocatedBytesPerCall": 718992
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 10.548,
+      "P95Ms": 11.094,
+      "MaxMs": 11.754,
+      "AllocatedBytesPerCall": 2550
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 10.613,
+      "P95Ms": 11.161,
+      "MaxMs": 11.833,
+      "AllocatedBytesPerCall": 3976
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 2.818,
+      "P95Ms": 3.047,
+      "MaxMs": 3.302,
+      "AllocatedBytesPerCall": 718896
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 11.072,
+      "P95Ms": 12.084,
+      "MaxMs": 12.899,
+      "AllocatedBytesPerCall": 6816
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 10028
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 0.593,
+      "P95Ms": 0.669,
+      "MaxMs": 0.807,
+      "AllocatedBytesPerCall": 718896
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 51.722,
+      "P95Ms": 52.377,
+      "MaxMs": 52.469,
+      "AllocatedBytesPerCall": 2512
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 52.674,
+      "P95Ms": 54.736,
+      "MaxMs": 54.788,
+      "AllocatedBytesPerCall": 3976
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 2.691,
+      "P95Ms": 2.997,
+      "MaxMs": 3.086,
+      "AllocatedBytesPerCall": 718896
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 27.963,
+      "P95Ms": 34.055,
+      "MaxMs": 34.989,
+      "AllocatedBytesPerCall": 6816
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 50028
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 26.44,
+      "P95Ms": 30.455,
+      "MaxMs": 30.875,
+      "AllocatedBytesPerCall": 65747175
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 77.96,
+      "P95Ms": 82.762,
+      "MaxMs": 85.905,
+      "AllocatedBytesPerCall": 2512
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 76.287,
+      "P95Ms": 77.896,
+      "MaxMs": 79.5,
+      "AllocatedBytesPerCall": 134024
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 6.522,
+      "P95Ms": 7.845,
+      "MaxMs": 8.984,
+      "AllocatedBytesPerCall": 13153986
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 7.018,
+      "P95Ms": 7.156,
+      "MaxMs": 7.169,
+      "AllocatedBytesPerCall": 6816
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 1028
+    },
+    {
+      "Scenario": "forced-lock",
+      "Operation": "synchronous-search",
+      "ElapsedMs": 1229.8933
+    }
+  ],
+  "UiObservations": [
+    {
+      "Source": "ui-normal-visible.json",
+      "Observation": {
+        "Scenario": "normal-visible-110-rows",
+        "Seconds": 10.2533783,
+        "CpuCorePercent": 1.6759113266955772,
+        "WorkingMiB": 202.45703125,
+        "PrivateMiB": 171.19921875,
+        "Responding": true
+      }
+    },
+    {
+      "Source": "ui-longtext-startup.json",
+      "Observation": {
+        "Scenario": "longtext",
+        "PID": 12988,
+        "WindowMs": 901.0253,
+        "Handle": {
+          "value": 918194
+        },
+        "Exited": false
+      }
+    },
+    {
+      "Source": "ui-longtext-foreground.json",
+      "Observation": {
+        "Scenario": "longtext-1028-rows",
+        "Seconds": 15.3198023,
+        "CpuCorePercent": 5.608994593193549,
+        "WorkingMiB": 715.125,
+        "PrivateMiB": 687.03515625,
+        "VisibleSamples": 30,
+        "TotalSamples": 30,
+        "Responding": true
+      }
+    },
+    {
+      "Source": "ui-images-startup.json",
+      "Observation": {
+        "PID": 14596,
+        "WindowMs": 532.5971,
+        "Handle": {
+          "value": 1050728
+        },
+        "Exited": false
+      }
+    },
+    {
+      "Source": "ui-images-foreground.json",
+      "Observation": {
+        "Scenario": "60-4K-images",
+        "Seconds": 10.241677,
+        "CpuCorePercent": 2.8982216316819382,
+        "WorkingMiB": 242.4609375,
+        "PrivateMiB": 212.109375,
+        "VisibleSamples": 20,
+        "TotalSamples": 20,
+        "Responding": true
+      }
+    }
+  ]
+}

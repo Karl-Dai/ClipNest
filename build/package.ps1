@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string]$Configuration = 'Release',
-    [string]$Version = '0.4.0',
+    [string]$Version = '0.4.1',
     [switch]$SkipInstaller,
     [string]$SignCertificateThumbprint = $env:CLIPNEST_SIGN_CERT_THUMBPRINT,
     [string]$SignToolPath,
@@ -30,15 +30,18 @@ try {
         }
         $signing = New-ClipNestSigningContext -Thumbprint $SignCertificateThumbprint -MachineStore:$SignMachineStore -SignToolPath $SignToolPath -TimestampServer $TimestampServer
     }
-    & $dotnet.Source build ClipNest.Windows.sln -c $Configuration --nologo
+    & $dotnet.Source build ClipNest.Windows.sln -c $Configuration -p:ClipNestDiagnostics=false --nologo
     if ($LASTEXITCODE) { throw 'Build failed' }
     & $dotnet.Source test tests/ClipNest.Core.Tests -c $Configuration --no-build --nologo
     if ($LASTEXITCODE) { throw 'Tests failed' }
     # Use a fresh staging folder, avoiding accidental deletion of any existing release.
     $staging = Join-Path $projectRoot ('dist/staging-' + [guid]::NewGuid().ToString('N'))
     $portable = Join-Path $staging 'ClipNest'
-    & $dotnet.Source publish src/ClipNest.App -c $Configuration -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:Version=$Version -o $portable --nologo
+    & $dotnet.Source publish src/ClipNest.App -c $Configuration -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -p:PublishSingleFile=false -p:ClipNestDiagnostics=false -p:Version=$Version -o $portable --nologo
     if ($LASTEXITCODE) { throw 'Publish failed' }
+    if ([Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes((Join-Path $portable 'ClipNest.dll'))).Contains('RunDiagnosticsAsync')) {
+        throw 'Diagnostic runtime must never be included in a distributable build.'
+    }
     if ($signing) {
         foreach ($name in @('ClipNest.exe', 'ClipNest.dll', 'ClipNest.Core.dll', 'ClipNest.Platform.dll')) {
             Invoke-ClipNestSign -Path (Join-Path $portable $name) -Signing $signing

@@ -14,6 +14,10 @@ public sealed class SqliteClipboardStore : IClipboardStore
         "id, created_at, kind, content, blob_path, content_hash, source_app, is_favorite";
 
     private readonly ClipNestDatabase _database;
+    private long _revision;
+    /// <summary>Changes whenever this shared store commits a history mutation.</summary>
+    public long Revision => System.Threading.Interlocked.Read(ref _revision);
+    private void Changed() => System.Threading.Interlocked.Increment(ref _revision);
 
     public SqliteClipboardStore(ClipNestDatabase database)
         => _database = database ?? throw new ArgumentNullException(nameof(database));
@@ -24,12 +28,21 @@ public sealed class SqliteClipboardStore : IClipboardStore
 
         using var conn = _database.Open();
         using var tx = conn.BeginTransaction();
+        // A capture may have read the previous setting before a concurrent settings save.
+        using (var limit = conn.CreateCommand())
+        {
+            limit.Transaction = tx;
+            limit.CommandText = "SELECT value FROM app_settings WHERE key = 'history_limit';";
+            if (int.TryParse(limit.ExecuteScalar() as string, out var currentLimit) && currentLimit > 0)
+                historyLimit = currentLimit;
+        }
 
         var existingId = FindIdByHash(conn, tx, entry.ContentHash, entry.Kind);
         if (existingId is not null)
         {
             BumpTimestamp(conn, tx, existingId, entry.CreatedAt);
             tx.Commit();
+            Changed();
 
             var dedupOrphans = entry.BlobPath is null
                 ? Array.Empty<string>()
@@ -40,6 +53,7 @@ public sealed class SqliteClipboardStore : IClipboardStore
         Insert(conn, tx, entry);
         var trimmedBlobs = TrimToHistoryLimit(conn, tx, historyLimit);
         tx.Commit();
+        Changed();
 
         return new AddResult(WasDeduplicated: false, trimmedBlobs);
     }
@@ -111,6 +125,89 @@ public sealed class SqliteClipboardStore : IClipboardStore
         return result;
     }
 
+    /// <summary>Reads bounded previews instead of materializing every matching full payload.</summary>
+    public ClipboardHistoryPage GetPage(string query, bool favoritesOnly, string? kind = null,
+        int offset = 0, int count = 100, System.Threading.CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
+        cancellationToken.ThrowIfCancellationRequested();
+        var revision = Revision;
+        using var conn = _database.Open();
+        using var tx = conn.BeginTransaction(deferred: true);
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        const string where = """
+            FROM clipboard_entries WHERE ($favorites = 0 OR is_favorite = 1)
+              AND ($kind IS NULL OR kind = $kind)
+              AND ($query = '' OR instr(lower(coalesce(content, '')), lower($query)) > 0
+                   OR instr(lower(coalesce(source_app, '')), lower($query)) > 0)
+            """;
+        cmd.CommandText = "SELECT COUNT(*) " + where;
+        cmd.Parameters.AddWithValue("$favorites", favoritesOnly ? 1 : 0);
+        cmd.Parameters.AddWithValue("$kind", (object?)kind ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$query", query.Trim());
+        var total = Convert.ToInt32(cmd.ExecuteScalar(), CultureInfo.InvariantCulture);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (total == 0 || offset >= total)
+        {
+            tx.Commit();
+            return new ClipboardHistoryPage(Array.Empty<ClipboardEntrySummary>(), total, revision);
+        }
+        cmd.CommandText = """
+            SELECT id, created_at, kind,
+                CASE WHEN kind IN ('text', 'file', 'color') THEN substr(content, 1, 161) ELSE NULL END,
+                blob_path, source_app, is_favorite
+            """ + " " + where + " ORDER BY created_at DESC, id DESC LIMIT $count OFFSET $offset;";
+        cmd.Parameters.AddWithValue("$count", count);
+        cmd.Parameters.AddWithValue("$offset", offset);
+        var result = new List<ClipboardEntrySummary>();
+        using (var reader = cmd.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                result.Add(new ClipboardEntrySummary(Guid.Parse(reader.GetString(0)),
+                    DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(1)),
+                    ClipboardKindExtensions.ParseClipboardKind(reader.GetString(2)),
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5), reader.GetBoolean(6)));
+            }
+        }
+        tx.Commit();
+        return new ClipboardHistoryPage(result, total, revision);
+    }
+
+    /// <summary>Loads the complete payload only when selected or copied.</summary>
+    public ClipboardEntry? GetById(Guid id)
+    {
+        using var conn = _database.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT {SelectColumns} FROM clipboard_entries WHERE id = $id;";
+        cmd.Parameters.AddWithValue("$id", id.ToString());
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? ReadEntry(reader) : null;
+    }
+
+    /// <summary>Atomically saves the limit and trims existing non-favorites. Caller removes returned blobs.</summary>
+    public IReadOnlyList<string> SetHistoryLimitAndTrim(int limit)
+    {
+        if (limit is < 10 or > 10000) throw new ArgumentOutOfRangeException(nameof(limit));
+        using var conn = _database.Open();
+        using var tx = conn.BeginTransaction();
+        using var cmd = conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "INSERT INTO app_settings (key, value) VALUES ('history_limit', $value) ON CONFLICT(key) DO UPDATE SET value = excluded.value;";
+        cmd.Parameters.AddWithValue("$value", limit.ToString(CultureInfo.InvariantCulture));
+        cmd.ExecuteNonQuery();
+        var orphans = TrimToHistoryLimit(conn, tx, limit);
+        tx.Commit();
+        Changed();
+        return orphans;
+    }
+
     public void SetFavorite(Guid id, bool favorite)
     {
         using var conn = _database.Open();
@@ -119,6 +216,7 @@ public sealed class SqliteClipboardStore : IClipboardStore
         cmd.Parameters.AddWithValue("$favorite", favorite ? 1 : 0);
         cmd.Parameters.AddWithValue("$id", id.ToString());
         cmd.ExecuteNonQuery();
+        Changed();
     }
 
     public IReadOnlyList<string> ClearHistory()
@@ -134,6 +232,7 @@ public sealed class SqliteClipboardStore : IClipboardStore
         cmd.CommandText = "DELETE FROM clipboard_entries WHERE is_favorite = 0;";
         cmd.ExecuteNonQuery();
         tx.Commit();
+        Changed();
         return blobs;
     }
 
@@ -144,6 +243,7 @@ public sealed class SqliteClipboardStore : IClipboardStore
         cmd.CommandText = "DELETE FROM clipboard_entries WHERE id = $id;";
         cmd.Parameters.AddWithValue("$id", id.ToString());
         cmd.ExecuteNonQuery();
+        Changed();
     }
 
     private static string? FindIdByHash(SqliteConnection conn, SqliteTransaction tx, string hash, ClipboardKind kind)
@@ -205,19 +305,17 @@ public sealed class SqliteClipboardStore : IClipboardStore
         }
 
         var excess = total - historyLimit;
-        var idsToDelete = new List<string>();
         var trimmedBlobs = new List<string>();
 
         using (var select = conn.CreateCommand())
         {
             select.Transaction = tx;
             select.CommandText =
-                "SELECT id, blob_path FROM clipboard_entries WHERE is_favorite = 0 ORDER BY created_at ASC LIMIT $n;";
+                "SELECT id, blob_path FROM clipboard_entries WHERE is_favorite = 0 ORDER BY created_at ASC, id ASC LIMIT $n;";
             select.Parameters.AddWithValue("$n", excess);
             using var reader = select.ExecuteReader();
             while (reader.Read())
             {
-                idsToDelete.Add(reader.GetString(0));
                 if (!reader.IsDBNull(1))
                 {
                     trimmedBlobs.Add(reader.GetString(1));
@@ -225,14 +323,11 @@ public sealed class SqliteClipboardStore : IClipboardStore
             }
         }
 
-        foreach (var id in idsToDelete)
-        {
-            using var delete = conn.CreateCommand();
-            delete.Transaction = tx;
-            delete.CommandText = "DELETE FROM clipboard_entries WHERE id = $id;";
-            delete.Parameters.AddWithValue("$id", id);
-            delete.ExecuteNonQuery();
-        }
+        using var delete = conn.CreateCommand();
+        delete.Transaction = tx;
+        delete.CommandText = "DELETE FROM clipboard_entries WHERE id IN (SELECT id FROM clipboard_entries WHERE is_favorite = 0 ORDER BY created_at ASC, id ASC LIMIT $n);";
+        delete.Parameters.AddWithValue("$n", excess);
+        delete.ExecuteNonQuery();
 
         return trimmedBlobs;
     }

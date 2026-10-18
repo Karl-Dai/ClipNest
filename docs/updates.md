@@ -23,7 +23,7 @@
 ## 构建及发布
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1 -Version 0.4.0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1 -Version 0.4.1
 ```
 
 脚本固定使用 Velopack 1.2.161，生成：
