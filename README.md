@@ -1,73 +1,209 @@
+<div align="center">
+
+<img src="design/clipnest-512.png" alt="拾贴 ClipNest 图标" width="96" />
+
 # 拾贴 ClipNest
 
-面向 Windows 11 的本地剪贴板管理器。
+**复制过的内容，随时找回来。**
 
-## 使用
+面向 Windows 11 的本地剪贴板管理器。用一个悬浮面板，收好文字、图片和常用片段。
 
-解压整个便携包，打开 `ClipNest/ClipNest.exe`。请保留同目录下的 DLL 和资源文件。
-无需另外安装 .NET 或 Windows App SDK。支持 Windows 11 22H2 及以上，x64。
+[![Windows 11](https://img.shields.io/badge/Windows_11-22H2%2B-08786E?logo=windows&logoColor=white)](#下载与安装)
+[![Native WinUI 3](https://img.shields.io/badge/Native-WinUI_3-08786E)](#开发与构建)
+[![Release](https://img.shields.io/github/v/release/Karl-Dai/ClipNest?color=08786E)](https://github.com/Karl-Dai/ClipNest/releases/latest)
+[![Build Windows](https://github.com/Karl-Dai/ClipNest/actions/workflows/build-windows.yml/badge.svg)](https://github.com/Karl-Dai/ClipNest/actions/workflows/build-windows.yml)
 
-- 默认 `Ctrl + Shift + V` 唤出历史，可在设置中修改。输入关键词可搜索内容或来源应用。
-- 历史以小型悬浮面板显示在鼠标附近，不占任务栏或 Alt+Tab 列表；顶部可拖动。
-- 点击其他应用、按 `Esc` 或粘贴后会收起。设置等模态弹窗打开时先完成或取消弹窗。
-- 方向键选择，`Enter` 或双击：粘贴到唤出前的应用。
-- “复制”：只写入剪贴板；“收藏”：保留常用内容。
-- `Esc` 或关闭按钮：隐藏窗口，继续在托盘运行。右键托盘选择“退出”。
-- 支持文本、图片、文件列表、颜色文本和 RTF 预览与复制。
-- 设置中可修改数据文件夹、唤出快捷键、历史上限（默认 100，范围 10–10000），以及启用登录启动、清理未收藏记录。
-- 收藏不会被历史上限或“清理历史”删除。每次搜索最多显示 500 条。
-- “暂停记录”用于临时停止采集，重启后恢复记录。
-- 默认展开右侧预览和详情，↑/↓ 切换记录时同步更新图片、文本、来源和时间；搜索框内也可直接用方向键选择。
-- 右下角“预览”可手动收起右侧面板，选择会自动保存。
-- 设置中可选择跟随系统、浅色或深色外观，重启后保留。
+[**下载 Windows 版**](https://github.com/Karl-Dai/ClipNest/releases/latest) · [功能演示](#功能演示) · [使用指南](#使用指南) · [反馈问题](https://github.com/Karl-Dai/ClipNest/issues)
 
-数据默认位于 `%LOCALAPPDATA%\ClipNest`，不会上传或同步。图片独立存储，文本和设置存于 SQLite。
-在设置中选择或输入一个空数据文件夹，保存后会复制历史、收藏、图片及设置，校验数据库，然后自动重启并使用新位置；原目录保留为备份。旧日志和缓存留在原目录，新日志写入新位置。迁移失败时继续使用原目录，不会覆盖目标已有文件。
-目录选择记录保存在 `%LOCALAPPDATA%\ClipNest-config\location.json`。自定义位置不可用时会显示提示并临时使用默认目录。
-快捷键支持 Ctrl / Alt（至少一个），可叠加 Shift，搭配字母、数字或 F1–F11。保存后立即生效，重启后保留；冲突时保留原快捷键，也可一键恢复默认组合。
-目前不包含 OCR、AI 和截图编辑。RTF 搜索针对原始 RTF 内容；富文本中的中文建议先以纯文本复制。
-自动粘贴可能受到管理员权限窗口限制；若失败，使用“复制”后手动 Ctrl+V。
-快捷键冲突时可用托盘打开。关闭冲突程序后，从托盘重新打开拾贴会重试注册。
+</div>
 
-## 0.3.0
+## 为什么做拾贴
 
-新增可配置的数据目录和全局快捷键。提供原生文件夹选择器、路径校验、数据库一致性备份及自动重启；新快捷键注册成功且配置保存后才释放旧快捷键。设置对话框支持滚动，错误提示保留在对话框中。
+刚复制的链接被下一次复制覆盖，截图要先粘贴才能确认，常用回复总要重新找——这些小事不应该打断工作。
 
-## 0.2.3
+拾贴在本机记录剪贴板历史。需要时按下 **Ctrl + Shift + V**，搜索或用方向键选中内容，预览确认后按 **Enter** 粘贴。用完收起，继续手头的事。
 
-使用为拾贴独立设计的「便签与小巢」图标，统一程序、托盘、标题栏、空状态及 Windows 磁贴资源。16–32 像素采用简化图形以保证清晰度。矢量源文件见 `design/clipnest.svg`；运行 `build/Generate-BrandAssets.ps1` 可重新生成全部品牌资源。
+## 功能演示
 
-## 0.2.2
+![拾贴实际操作：历史记录、方向键图片预览、搜索、收藏和快捷键录入](docs/media/overview.gif)
 
-恢复默认双栏悬浮面板（880×480 DIP），升级时自动展开右侧预览。搜索框内 ↑/↓ 直接切换所选记录，列表中的键盘焦点与选择同步。图片按预览区域完整缩放，便于连续浏览图片；仍保留失焦收起和鼠标附近唤出的行为。
+*约 22 秒循环演示，录自 Windows 11 实际界面。画面中的记录均为专门生成的演示数据。*
 
-## 0.2.1
+| 功能 | 使用体验 |
+| --- | --- |
+| 悬浮面板 | 在鼠标附近唤出，顶部可拖动；不占任务栏或 Alt+Tab 列表 |
+| 键盘浏览 | ↑ / ↓ 切换记录，右侧预览同步更新；Enter 粘贴 |
+| 图片预览 | 列表显示缩略图，右侧完整缩放展示图片，并显示来源和时间 |
+| 搜索与筛选 | 按内容或来源应用搜索；按文本、图片、文件、颜色、富文本筛选 |
+| 常用收藏 | 保存常用链接、回复和片段；收藏不受普通历史上限影响 |
+| 直接录入快捷键 | 点击输入框后按组合键，保存即生效；支持冲突提示和恢复默认 |
+| 可选数据位置 | 选择空文件夹，自动迁移历史、收藏、图片与设置，并保留原目录备份 |
+| 原生外观 | WinUI 3、Acrylic 背景、浅色 / 深色 / 跟随系统 |
+| 托盘常驻 | 收起后继续记录；支持暂停记录和登录 Windows 时启动 |
 
-改为原生悬浮工具面板：移除系统标题栏和最小化/最大化按钮，默认 520×480 DIP，使用 Acrylic 背景。显示时置于上层，失焦自动收起；唤出位置跟随鼠标并限制在屏幕工作区内。仍可展开内容预览、拖动顶部、从托盘打开。
+### 支持的内容
 
-## 0.2.0
+| 类型 | 记录与预览 | 复制 / 粘贴 |
+| --- | --- | --- |
+| 文本、链接、代码片段 | 原文预览与搜索 | 文本 |
+| 图片 | 列表缩略图及右侧预览 | 图片 |
+| 文件与文件夹 | 路径列表 | 原文件与文件夹引用 |
+| 颜色文本 | 识别并归类，如 `#08786E` | 颜色文本 |
+| RTF 富文本 | 富文本预览 | 富文本及纯文本 |
 
-重做原生 Fluent 界面：Mica 背景、一体化标题栏、最近/收藏切换、类型图标、图片缩略图、可收起预览和浅深色设置。窗口尺寸按 DPI 缩放，窄窗口自动收起侧边预览。
+文件记录保存的是路径引用，**不会备份文件本体**；原文件被移动或删除后无法从历史中恢复。图片记录会保存在独立的本地文件中。
 
-修复窗口隐藏/最小化后的原生恢复与前台激活；加入快捷键注册和唤起日志。删除单条历史增加确认，操作结果以可关闭提示展示。
+## 下载与安装
 
-设计参考：[Microsoft WinUI design skill](https://github.com/microsoft/winappCli/tree/main/plugins/winui/agent-plugin/skills/winui-design)、[WinUI Gallery](https://github.com/microsoft/WinUI-Gallery)。
+**运行要求：Windows 11 22H2 或更高版本，x64。**
 
-## 开发
+1. 打开 [Releases](https://github.com/Karl-Dai/ClipNest/releases/latest)，下载 `ClipNest-版本号-win-x64.zip`。
+2. 将整个 ZIP 解压到一个固定文件夹。
+3. 打开其中的 `ClipNest/ClipNest.exe`，开始复制内容。
 
-安装 .NET 8 SDK（`global.json` 会选择可用的 8.0 SDK）。
+便携包包含 .NET 与 Windows App SDK 运行时，无需另外安装。请保留程序同目录下的 DLL、资源和子文件夹；不要只取出 EXE 单独运行。
+
+可使用发布页的 `.sha256` 文件校验下载：
 
 ```powershell
+Get-FileHash .\ClipNest-0.3.1-win-x64.zip -Algorithm SHA256
+```
+
+### 更新版本
+
+从托盘菜单退出拾贴，将新版解压到新文件夹后运行。数据默认保存在程序文件夹之外，正常更新会继续读取原有历史。若启用了登录启动，移动程序位置后请在设置中关闭再启用一次。
+
+## 使用指南
+
+### 找到并粘贴历史内容
+
+1. 在任何应用中正常复制内容。
+2. 切回需要粘贴的位置，按 **Ctrl + Shift + V** 唤出拾贴。
+3. 输入关键词搜索，或用 **↑ / ↓** 选择记录。
+4. 查看右侧预览，按 **Enter** 或双击记录完成粘贴。
+
+点击“复制”只会将选中的记录写入剪贴板，适合切换应用后手动粘贴。右下角“预览”可以收起或展开右侧面板。
+
+| 操作 | 默认行为 |
+| --- | --- |
+| Ctrl + Shift + V | 唤出 / 收起历史面板，可在设置中修改 |
+| ↑ / ↓ | 选择上一条 / 下一条，在搜索框中也可使用 |
+| Enter / 双击记录 | 粘贴到唤出前的应用 |
+| Esc / 点击外部 / 右上角关闭 | 收起面板，继续在托盘运行 |
+| 星标按钮 | 收藏 / 取消收藏选中记录 |
+| 右键托盘图标 → 退出 | 完全退出程序 |
+
+设置等模态对话框打开时，请先完成或取消对话框，再收起面板。
+
+### 直接按键设置快捷键
+
+![在设置中直接按组合键录入快捷键](docs/media/shortcut.gif)
+
+打开右上角 **设置**，点击“唤出快捷键”输入框，直接按下想使用的组合，再点击 **保存**。按 **Esc** 撤销本次录入；按 **Tab** 可移至下一项。
+
+- 组合必须包含 **Ctrl 或 Alt**，可叠加 Shift。
+- 主键支持字母、数字、F1–F11。
+- 快捷键冲突时会提示错误，并保留原快捷键。
+- 点击“恢复 Ctrl + Shift + V”可恢复默认组合，保存后生效。
+
+### 管理历史与外观
+
+设置中可以调整历史上限、数据文件夹、外观和登录启动。普通历史默认保留 **100 条**，可调整为 **10–10000 条**；收藏不计入此上限。每次搜索最多展示 500 条结果。
+
+“清理历史”会在确认后移除未收藏的记录，保留收藏。顶部暂停按钮用于临时停止采集，重启程序后会恢复记录。
+
+## 数据与隐私
+
+拾贴的剪贴板历史保存在本机，应用不提供云端上传、账户登录或同步功能。**本地数据库和图片文件未加密**，请像其他个人文件一样妥善管理。
+
+默认数据目录：
+
+```text
+%LOCALAPPDATA%\ClipNest\
+├─ db\clipnest.db     # 历史、收藏和历史上限等设置
+├─ blobs\            # 图片文件
+├─ logs\             # 本地运行日志
+├─ cache\            # 缓存目录
+├─ appearance.json   # 外观、预览布局与自定义快捷键
+└─ settings.json     # 初始化配置文件
+```
+
+### 更换数据位置
+
+在设置中选择或输入一个 **空文件夹**，保存后程序会等待正在写入的记录完成，再复制数据库、图片和设置，校验数据库并自动重启。原目录保留为备份；迁移失败时继续使用原目录，不覆盖目标文件夹中的已有数据。
+
+旧日志和缓存留在原位置，新日志写入新位置。目录选择记录存放于 `%LOCALAPPDATA%\ClipNest-config\location.json`。自定义位置暂不可用时会显示提示，并临时使用默认目录。
+
+备份时建议先退出拾贴，再复制整个数据文件夹。仅复制数据库不会包含图片。
+
+## 常见问题
+
+<details>
+<summary><strong>按快捷键没有反应？</strong></summary>
+
+先通过托盘图标打开面板，查看底部是否提示快捷键冲突。可以关闭占用该组合的程序，或在设置中换一个组合。从托盘重新打开面板时，拾贴会重试注册当前快捷键。
+
+</details>
+
+<details>
+<summary><strong>为什么无法自动粘贴到某些窗口？</strong></summary>
+
+管理员权限窗口可能限制普通应用的模拟输入。可点击“复制”，切换到目标窗口后手动按 Ctrl + V。目标窗口已关闭或焦点发生变化时，自动粘贴也可能无法完成。
+
+</details>
+
+<details>
+<summary><strong>图片为什么没有出现在历史中？</strong></summary>
+
+先检查是否暂停了记录。并非所有应用的复制操作都会提供可读取的图片格式；超过 16 MB 的 PNG 图片也不会被记录。若原有图片文件在数据目录中被手动删除，对应记录会提示文件丢失。
+
+</details>
+
+<details>
+<summary><strong>是否支持 OCR、AI、截图编辑或同步？</strong></summary>
+
+当前版本不包含这些功能。RTF 搜索基于原始富文本内容；需要搜索富文本中的中文时，建议先以纯文本复制。
+
+</details>
+
+## 开发与构建
+
+使用 **.NET 8 SDK**，在 Windows 上构建。`global.json` 会选择可用的 .NET 8 SDK，NuGet 依赖在首次构建时恢复。
+
+```powershell
+git clone https://github.com/Karl-Dai/ClipNest.git
+cd ClipNest
+
 dotnet build ClipNest.Windows.sln -c Release
 dotnet test tests/ClipNest.Core.Tests -c Release
 dotnet run --project src/ClipNest.App
-./build/package.ps1
+
+# 构建、测试并生成包含运行时的便携包
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1
 ```
 
-`build/package.ps1` 构建、测试并生成包含运行时的便携 ZIP。
-设置环境变量 `CLIPNEST_DATA_ROOT` 可将初始测试数据隔离到指定目录下的 `ClipNest` 子目录；测试位置记录放在同级 `ClipNest-config`，与正式配置隔离。
+构建输出位于 `dist/`。GitHub Actions 也会执行构建、测试及打包，可从 [工作流页面](https://github.com/Karl-Dai/ClipNest/actions) 下载构建产物。
 
-## 来源
+```text
+src/ClipNest.App/         WinUI 3 界面、托盘、快捷键与设置
+src/ClipNest.Core/        数据模型、SQLite、去重与数据迁移
+src/ClipNest.Platform/    Windows 剪贴板监听与读取
+tests/ClipNest.Core.Tests/ 核心测试
+build/                   打包、图标生成及演示制作脚本
+design/                  原创图标的 SVG 和 PNG 源资源
+docs/                    产品演示与上游设计文档
+```
 
-Windows 基础工程源自 [Karl-Dai/VeloxClip](https://github.com/Karl-Dai/VeloxClip)，现作为独立产品维护。
-原始来源及署名见 [UPSTREAM.md](UPSTREAM.md)。
+开发时可设置 `CLIPNEST_DATA_ROOT`，将测试数据与正式历史隔离。初始数据位于该目录下的 `ClipNest` 子文件夹，目录选择配置位于同级 `ClipNest-config`。文档动图的演示数据和制作方法见 [演示说明](docs/media/README.md)。
+
+## 更新记录
+
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。**0.3.1** 将快捷键设置改为直接按组合键录入，保留冲突检查、Esc 撤销和恢复默认；**0.3.0** 加入数据目录迁移与可配置快捷键。
+
+## 来源与致谢
+
+Windows 基础工程源自 [Karl-Dai/VeloxClip](https://github.com/Karl-Dai/VeloxClip) 的 Windows 工程，拾贴作为独立产品持续开发。来源、版本及许可背景见 [UPSTREAM.md](UPSTREAM.md)。
+
+应用图标为拾贴独立设计的“便签与小巢”，源文件见 [design](design/)。界面设计参考 [WinUI Gallery](https://github.com/microsoft/WinUI-Gallery) 与 [Microsoft WinUI design skill](https://github.com/microsoft/winappCli/tree/main/plugins/winui/agent-plugin/skills/winui-design)。
+
+欢迎通过 [Issues](https://github.com/Karl-Dai/ClipNest/issues) 提交问题或建议。反馈时请附上 Windows 版本、拾贴版本及复现步骤，日志或截图中的私人内容请先移除。

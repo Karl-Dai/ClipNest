@@ -30,6 +30,7 @@ public sealed partial class MainWindow : Window, IDisposable
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _timer;
     private bool _ready;
     private bool _busy;
+    private Action<HotkeySetting>? _recordHotkey;
     private bool _previewRequested = true;
     private readonly UiPreferences _appearance;
     private IReadOnlyList<ClipboardEntry> _lastEntries = Array.Empty<ClipboardEntry>();
@@ -78,6 +79,9 @@ public sealed partial class MainWindow : Window, IDisposable
         };
         _desktop.ToggleRequested += (_, _) =>
         {
+            // The registered combination is delivered as WM_HOTKEY rather than
+            // a TextBox key event. Feed it into the focused recorder as well.
+            if (_recordHotkey is not null) { _recordHotkey(_desktop.Hotkey); return; }
             if (_busy) return;
             if (AppWindow.IsVisible && _desktop.IsForeground) Hide(); else ShowHistory();
         };
@@ -372,19 +376,51 @@ public sealed partial class MainWindow : Window, IDisposable
             var startup = new CheckBox { Content = "登录 Windows 时启动", IsChecked = StartupRegistration.IsEnabled };
             var panel = new StackPanel { Spacing = 16, MinWidth = 300, MaxWidth = 440 };
             var theme = new ComboBox { Header = "外观", ItemsSource = new[] { "跟随系统", "浅色", "深色" }, SelectedIndex = (int)Root.RequestedTheme, HorizontalAlignment = HorizontalAlignment.Stretch };
-            var ctrl = new CheckBox { Content = "Ctrl", IsChecked = (_desktop.Hotkey.Modifiers & 2) != 0, MinWidth = 0 };
-            var shift = new CheckBox { Content = "Shift", IsChecked = (_desktop.Hotkey.Modifiers & 4) != 0, MinWidth = 0 };
-            var alt = new CheckBox { Content = "Alt", IsChecked = (_desktop.Hotkey.Modifiers & 1) != 0, MinWidth = 0 };
-            var keyOptions = Enumerable.Range(0x41, 26).Concat(Enumerable.Range(0x30, 10)).Concat(Enumerable.Range(0x70, 11)).Select(k => (uint)k).ToArray();
-            var key = new ComboBox { ItemsSource = keyOptions.Select(k => new HotkeySetting(2, k).KeyLabel).ToArray(), SelectedIndex = Array.IndexOf(keyOptions, _desktop.Hotkey.Key), Width = 76 };
-            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(key, "快捷键主键");
-            var hotkeyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-            hotkeyRow.Children.Add(ctrl); hotkeyRow.Children.Add(shift); hotkeyRow.Children.Add(alt); hotkeyRow.Children.Add(key);
+            var candidate = _desktop.Hotkey;
+            string? recordingError = null;
+            const string recordingHelp = "点击输入框，直接按组合键。需包含 Ctrl 或 Alt，搭配字母、数字或 F1–F11；Esc 撤销录入。";
+            var recorder = new TextBox { Header = "唤出快捷键", Text = candidate.Label, IsReadOnly = true, MinHeight = 40 };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(recorder, "唤出快捷键，直接按组合键录入");
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetHelpText(recorder, recordingHelp);
+            var recordingHint = new TextBlock { Text = recordingHelp, TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+            void Record(HotkeySetting value)
+            {
+                if (!value.IsValid)
+                {
+                    recordingError = "组合无效：请按 Ctrl 或 Alt，加字母、数字或 F1–F11。";
+                    recordingHint.Text = recordingError;
+                    return;
+                }
+                candidate = value;
+                recordingError = null;
+                recorder.Text = value.Label;
+                recordingHint.Text = "已录入 " + value.Label + "，点击「保存」后生效。";
+            }
+            recorder.GotFocus += (_, _) => _recordHotkey = Record;
+            recorder.LostFocus += (_, _) => _recordHotkey = null;
+            recorder.PreviewKeyDown += (_, args) =>
+            {
+                if (args.Key == VirtualKey.Tab) return; // Preserve keyboard navigation.
+                args.Handled = true; // No typing, paste, or dialog default action while recording.
+                if (args.Key == VirtualKey.Escape)
+                {
+                    candidate = _desktop.Hotkey;
+                    recorder.Text = candidate.Label;
+                    recordingError = null;
+                    recordingHint.Text = "已撤销录入，保留当前快捷键。";
+                    return;
+                }
+                if (args.Key is VirtualKey.Control or VirtualKey.LeftControl or VirtualKey.RightControl
+                    or VirtualKey.Shift or VirtualKey.LeftShift or VirtualKey.RightShift
+                    or VirtualKey.Menu or VirtualKey.LeftMenu or VirtualKey.RightMenu
+                    or VirtualKey.LeftWindows or VirtualKey.RightWindows) return;
+                Record(new HotkeySetting(ReadHotkeyModifiers(), (uint)args.Key));
+            };
             var shortcut = new StackPanel { Spacing = 8 };
-            shortcut.Children.Add(new TextBlock { Text = "唤出快捷键", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-            shortcut.Children.Add(hotkeyRow);
+            shortcut.Children.Add(recorder);
+            shortcut.Children.Add(recordingHint);
             var resetHotkey = new HyperlinkButton { Content = "恢复 Ctrl + Shift + V", Padding = new Thickness(0) };
-            resetHotkey.Click += (_, _) => { ctrl.IsChecked = true; shift.IsChecked = true; alt.IsChecked = false; key.SelectedIndex = Array.IndexOf(keyOptions, 0x56u); };
+            resetHotkey.Click += (_, _) => Record(HotkeySetting.Default);
             shortcut.Children.Add(resetHotkey);
             var location = new TextBox { Header = "数据文件夹", Text = _paths.Root, TextWrapping = TextWrapping.Wrap, MaxHeight = 88 };
             var browse = new Button { Content = "选择文件夹…" };
@@ -426,7 +462,7 @@ public sealed partial class MainWindow : Window, IDisposable
                     }
                     if (!double.IsFinite(limit.Value) || limit.Value < 10 || limit.Value > 10000)
                         throw new InvalidOperationException("请输入 10–10000 之间的历史条数。");
-                    var candidate = new HotkeySetting((ctrl.IsChecked == true ? 2u : 0u) | (shift.IsChecked == true ? 4u : 0u) | (alt.IsChecked == true ? 1u : 0u), keyOptions[key.SelectedIndex]);
+                    if (recordingError is not null) throw new InvalidOperationException(recordingError);
                     _desktop.ChangeHotkey(candidate, () =>
                     {
                         var oldHotkey = _appearance.Hotkey;
@@ -467,7 +503,16 @@ public sealed partial class MainWindow : Window, IDisposable
             }
         }
         catch (Exception ex) { ShowError(ex); }
-        finally { _busy = false; }
+        finally { _recordHotkey = null; _busy = false; }
+    }
+
+    private static uint ReadHotkeyModifiers()
+    {
+        static bool Down(VirtualKey key) => (Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key)
+            & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+        return (Down(VirtualKey.Control) ? 2u : 0u) | (Down(VirtualKey.Shift) ? 4u : 0u)
+            | (Down(VirtualKey.Menu) ? 1u : 0u)
+            | (Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows) ? 8u : 0u);
     }
 }
 

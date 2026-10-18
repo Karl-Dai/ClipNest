@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$Configuration = 'Release', [string]$Version = '0.3.0')
+param([string]$Configuration = 'Release', [string]$Version = '0.3.1')
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path "$PSScriptRoot/..").Path
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -17,6 +17,10 @@ try {
     if ($LASTEXITCODE) { throw 'Publish failed' }
     Copy-Item README.md "$portable/使用说明.md"
     Copy-Item UPSTREAM.md "$portable/UPSTREAM.md"
+    Copy-Item CHANGELOG.md "$portable/CHANGELOG.md"
+    New-Item -ItemType Directory -Path "$portable/docs", "$portable/design" -Force | Out-Null
+    Copy-Item docs/media "$portable/docs/media" -Recurse
+    Copy-Item design/clipnest-512.png "$portable/design/clipnest-512.png"
     $zip = Join-Path $projectRoot "dist/ClipNest-$Version-win-x64.zip"
     Compress-Archive -LiteralPath $portable -DestinationPath $zip -Force
     (Get-FileHash $zip -Algorithm SHA256).Hash + '  ' + [IO.Path]::GetFileName($zip) | Set-Content "$zip.sha256"
