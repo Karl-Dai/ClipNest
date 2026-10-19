@@ -40,6 +40,13 @@ keeps a memory-only backup of readable clipboard formats, and restores it unless
 has replaced the test payload. It then restores the normal application and runs the isolated soak
 instance in the background using a separate instance key and a different hotkey.
 
+When real-clipboard validation has already been completed, `-SkipClipboard` runs a separate soak
+without pausing the normal app or rewriting the system clipboard. Its report explicitly marks the
+clipboard phases as skipped; use the default run for full-content copy and rapid-capture validation.
+Progress and partial resource samples are saved every minute. Only a final `result.json` with
+`Status: passed` and the requested completed duration proves the soak finished; interrupted runs
+must not be combined to claim a continuous hour.
+
 Tests load all 1,280 fixture rows, find and copy a suffix of a 65,579-character entry, switch 240 large
 images plus 80 overlapping selections, and send 100 real clipboard values with a requested 20 ms gap.
 Actual send duration and captured count are reported; OS scheduling may make the gap longer.
@@ -54,3 +61,4 @@ the automated workload. Neither diagnostic flag nor its instance-key behavior ex
 
 For the separate Windows app measurements and limitations see
 [the 2026-10-18 report](../../docs/performance-2026-10-18.md).
+The fixes and post-change results are documented in [the 0.4.1 report](../../docs/testing-0.4.1.md).

@@ -1,0 +1,110 @@
+{
+  "Status": "passed",
+  "StartedUtc": "2026-10-18T14:31:11.3347124+00:00",
+  "EndedUtc": "2026-10-18T14:31:51.519532+00:00",
+  "RequestedSoakMinutes": 0.5,
+  "Checks": [
+    {
+      "Name": "all-pages",
+      "Loaded": 1280,
+      "Total": 1280
+    },
+    {
+      "Name": "clipboard-backup",
+      "ReadableFormats": 2,
+      "UnsupportedFormats": 0
+    },
+    {
+      "Name": "full-content-copy",
+      "Characters": 65579
+    },
+    {
+      "Name": "large-image-switching",
+      "Sequential": 240,
+      "Overlapping": 80,
+      "CacheEntries": 4
+    },
+    {
+      "Name": "rapid-real-clipboard",
+      "Sent": 100,
+      "Captured": 100,
+      "RequestedGapMs": 20,
+      "ActualSendMs": 3115.5156
+    },
+    {
+      "Name": "continuous-soak",
+      "Minutes": 0.50327205,
+      "Iterations": 6
+    },
+    {
+      "Name": "immediate-retention",
+      "Total": 23,
+      "Favorites": 13
+    }
+  ],
+  "Samples": [
+    {
+      "Seconds": 0.02,
+      "WorkingMiB": 262.0234375,
+      "PrivateMiB": 219.6328125,
+      "ManagedMiB": 9.848594665527344,
+      "CpuSeconds": 9.046875,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1362
+    },
+    {
+      "Seconds": 5.04,
+      "WorkingMiB": 265.23828125,
+      "PrivateMiB": 222.77734375,
+      "ManagedMiB": 11.166824340820312,
+      "CpuSeconds": 9.265625,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1381
+    },
+    {
+      "Seconds": 10.08,
+      "WorkingMiB": 266.06640625,
+      "PrivateMiB": 223.140625,
+      "ManagedMiB": 11.541297912597656,
+      "CpuSeconds": 9.40625,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1381
+    },
+    {
+      "Seconds": 15.12,
+      "WorkingMiB": 257.12109375,
+      "PrivateMiB": 215.2265625,
+      "ManagedMiB": 2.8206634521484375,
+      "CpuSeconds": 9.59375,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1381
+    },
+    {
+      "Seconds": 20.16,
+      "WorkingMiB": 257.83984375,
+      "PrivateMiB": 215.87890625,
+      "ManagedMiB": 3.1953811645507812,
+      "CpuSeconds": 9.6875,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1381
+    },
+    {
+      "Seconds": 25.18,
+      "WorkingMiB": 259.26171875,
+      "PrivateMiB": 217.8984375,
+      "ManagedMiB": 3.585205078125,
+      "CpuSeconds": 9.84375,
+      "CacheEntries": 4,
+      "Loaded": 1280,
+      "Total": 1381
+    }
+  ],
+  "Failures": [],
+  "ImageSwitchP95Ms": 30.7213,
+  "ImageSwitchMaxMs": 31.3082
+}

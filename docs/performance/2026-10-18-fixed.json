@@ -1,0 +1,501 @@
+{
+  "TimestampUtc": "2026-10-18T14:54:33.0690157+00:00",
+  "Framework": ".NET 8.0.31",
+  "Results": [
+    {
+      "Scenario": "normal-100",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.183,
+      "P95Ms": 0.198,
+      "MaxMs": 0.217,
+      "AllocatedBytesPerCall": 145600
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "page-recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.214,
+      "P95Ms": 0.321,
+      "MaxMs": 0.388,
+      "AllocatedBytesPerCall": 67024
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.084,
+      "P95Ms": 0.151,
+      "MaxMs": 0.153,
+      "AllocatedBytesPerCall": 2608
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "page-no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.071,
+      "P95Ms": 0.074,
+      "MaxMs": 0.076,
+      "AllocatedBytesPerCall": 3936
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 0.083,
+      "P95Ms": 0.085,
+      "MaxMs": 0.086,
+      "AllocatedBytesPerCall": 4072
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "page-oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 0.16,
+      "P95Ms": 0.164,
+      "MaxMs": 0.192,
+      "AllocatedBytesPerCall": 6248
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 10,
+      "MedianMs": 0.04,
+      "P95Ms": 0.048,
+      "MaxMs": 0.063,
+      "AllocatedBytesPerCall": 17016
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "page-favorites",
+      "Iterations": 25,
+      "ResultCount": 10,
+      "MedianMs": 0.059,
+      "P95Ms": 0.063,
+      "MaxMs": 0.099,
+      "AllocatedBytesPerCall": 11880
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 2.073,
+      "P95Ms": 2.894,
+      "MaxMs": 2.896,
+      "AllocatedBytesPerCall": 9222
+    },
+    {
+      "Scenario": "normal-100",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 20,
+      "NonFavoritesImmediatelyAfterSetting": 10
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 0.71,
+      "P95Ms": 0.841,
+      "MaxMs": 1.91,
+      "AllocatedBytesPerCall": 719035
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "page-recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.212,
+      "P95Ms": 0.274,
+      "MaxMs": 0.276,
+      "AllocatedBytesPerCall": 67024
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.67,
+      "P95Ms": 0.796,
+      "MaxMs": 0.842,
+      "AllocatedBytesPerCall": 2608
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "page-no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 0.6,
+      "P95Ms": 0.651,
+      "MaxMs": 1.237,
+      "AllocatedBytesPerCall": 3962
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 0.683,
+      "P95Ms": 0.717,
+      "MaxMs": 0.89,
+      "AllocatedBytesPerCall": 4072
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "page-oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 1.301,
+      "P95Ms": 1.409,
+      "MaxMs": 1.449,
+      "AllocatedBytesPerCall": 6248
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.233,
+      "P95Ms": 0.241,
+      "MaxMs": 0.261,
+      "AllocatedBytesPerCall": 146320
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "page-favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 0.306,
+      "P95Ms": 0.371,
+      "MaxMs": 0.391,
+      "AllocatedBytesPerCall": 67024
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 1.929,
+      "P95Ms": 2.085,
+      "MaxMs": 2.09,
+      "AllocatedBytesPerCall": 7800
+    },
+    {
+      "Scenario": "normal-1000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 110,
+      "NonFavoritesImmediatelyAfterSetting": 10
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 0.767,
+      "P95Ms": 0.825,
+      "MaxMs": 1.193,
+      "AllocatedBytesPerCall": 718992
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "page-recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 3.59,
+      "P95Ms": 3.918,
+      "MaxMs": 4.288,
+      "AllocatedBytesPerCall": 67024
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 10.682,
+      "P95Ms": 10.821,
+      "MaxMs": 11.147,
+      "AllocatedBytesPerCall": 2604
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "page-no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 9.576,
+      "P95Ms": 10.01,
+      "MaxMs": 10.472,
+      "AllocatedBytesPerCall": 3744
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 10.666,
+      "P95Ms": 10.844,
+      "MaxMs": 11.082,
+      "AllocatedBytesPerCall": 3976
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "page-oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 17.656,
+      "P95Ms": 17.99,
+      "MaxMs": 18.13,
+      "AllocatedBytesPerCall": 6008
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 2.675,
+      "P95Ms": 3.115,
+      "MaxMs": 3.126,
+      "AllocatedBytesPerCall": 718896
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "page-favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 3.754,
+      "P95Ms": 3.859,
+      "MaxMs": 3.859,
+      "AllocatedBytesPerCall": 66784
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 5.953,
+      "P95Ms": 6.093,
+      "MaxMs": 6.094,
+      "AllocatedBytesPerCall": 7464
+    },
+    {
+      "Scenario": "normal-10000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 1010,
+      "NonFavoritesImmediatelyAfterSetting": 10
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 0.573,
+      "P95Ms": 0.655,
+      "MaxMs": 0.853,
+      "AllocatedBytesPerCall": 718896
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "page-recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 20.431,
+      "P95Ms": 25.193,
+      "MaxMs": 25.348,
+      "AllocatedBytesPerCall": 66784
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 60.973,
+      "P95Ms": 65.578,
+      "MaxMs": 78.848,
+      "AllocatedBytesPerCall": 2512
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "page-no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 53.516,
+      "P95Ms": 58.286,
+      "MaxMs": 58.395,
+      "AllocatedBytesPerCall": 3744
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 59.397,
+      "P95Ms": 65.04,
+      "MaxMs": 65.251,
+      "AllocatedBytesPerCall": 3976
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "page-oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 108.938,
+      "P95Ms": 127.88,
+      "MaxMs": 137.27,
+      "AllocatedBytesPerCall": 6008
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 3.107,
+      "P95Ms": 4.047,
+      "MaxMs": 6.5,
+      "AllocatedBytesPerCall": 718922
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "page-favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 21.466,
+      "P95Ms": 24.052,
+      "MaxMs": 24.491,
+      "AllocatedBytesPerCall": 66784
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 23.988,
+      "P95Ms": 27.147,
+      "MaxMs": 28.01,
+      "AllocatedBytesPerCall": 7464
+    },
+    {
+      "Scenario": "stress-50000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 5010,
+      "NonFavoritesImmediatelyAfterSetting": 10
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "recent",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 32.026,
+      "P95Ms": 39.419,
+      "MaxMs": 46.184,
+      "AllocatedBytesPerCall": 65747603
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "page-recent",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 4.216,
+      "P95Ms": 5.128,
+      "MaxMs": 5.563,
+      "AllocatedBytesPerCall": 66784
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 90.485,
+      "P95Ms": 97.216,
+      "MaxMs": 101.014,
+      "AllocatedBytesPerCall": 2512
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "page-no-match",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 103.61,
+      "P95Ms": 129.808,
+      "MaxMs": 130.336,
+      "AllocatedBytesPerCall": 3744
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 88.892,
+      "P95Ms": 107.264,
+      "MaxMs": 117.767,
+      "AllocatedBytesPerCall": 134024
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "page-oldest-match",
+      "Iterations": 25,
+      "ResultCount": 1,
+      "MedianMs": 188.15,
+      "P95Ms": 221.231,
+      "MaxMs": 227.893,
+      "AllocatedBytesPerCall": 6008
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 7.529,
+      "P95Ms": 11.242,
+      "MaxMs": 11.646,
+      "AllocatedBytesPerCall": 13156598
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "page-favorites",
+      "Iterations": 25,
+      "ResultCount": 100,
+      "MedianMs": 4.878,
+      "P95Ms": 6.486,
+      "MaxMs": 6.696,
+      "AllocatedBytesPerCall": 66784
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "insert-and-trim",
+      "Iterations": 25,
+      "ResultCount": 0,
+      "MedianMs": 2.059,
+      "P95Ms": 3.081,
+      "MaxMs": 3.911,
+      "AllocatedBytesPerCall": 7464
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "page-recent-500",
+      "Iterations": 25,
+      "ResultCount": 500,
+      "MedianMs": 20.936,
+      "P95Ms": 23.948,
+      "MaxMs": 26.316,
+      "AllocatedBytesPerCall": 302608
+    },
+    {
+      "Scenario": "large-text-1000",
+      "Operation": "retention-change-to-10",
+      "RowsImmediatelyAfterSetting": 110,
+      "NonFavoritesImmediatelyAfterSetting": 10
+    },
+    {
+      "Scenario": "forced-lock",
+      "Operation": "page-search-during-1200ms-write-lock",
+      "QueryElapsedMs": 7.8953
+    }
+  ]
+}

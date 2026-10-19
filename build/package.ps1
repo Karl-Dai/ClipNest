@@ -55,6 +55,8 @@ try {
     Copy-Item docs/updates.md "$portable/docs/updates.md"
     Copy-Item docs/signing.md "$portable/docs/signing.md"
     Get-ChildItem docs -Filter 'testing-*.md' | Copy-Item -Destination "$portable/docs"
+    Get-ChildItem docs -Filter 'performance-*.md' | Copy-Item -Destination "$portable/docs"
+    if (Test-Path docs/performance) { Copy-Item docs/performance "$portable/docs/performance" -Recurse }
     Copy-Item design/clipnest-512.png "$portable/design/clipnest-512.png"
     $zip = Join-Path $projectRoot "dist/ClipNest-$Version-win-x64.zip"
     Compress-Archive -LiteralPath $portable -DestinationPath $zip -Force

@@ -28,6 +28,7 @@ public sealed partial class MainWindow
         var failures = new List<string>();
         var started = DateTimeOffset.UtcNow;
         var status = "running";
+        var skipClipboard = System.Environment.GetEnvironmentVariable("CLIPNEST_DIAGNOSTICS_SKIP_CLIPBOARD") == "1";
         DataPackage? clipboardBackup = null;
         var clipboardWasEmpty = false;
         var clipboardStreams = new List<InMemoryRandomAccessStream>();
@@ -42,38 +43,44 @@ public sealed partial class MainWindow
             Check(_rows.Count == _totalEntries && _rows.Select(row => row.Entry.Id).Distinct().Count() == _totalEntries, "All history pages accessible without gaps or duplicates");
             checks.Add(new { Name = "all-pages", Loaded = _rows.Count, Total = _totalEntries });
 
-            // Preserve readable original formats in memory only, never in a test report or repository.
-            var original = Clipboard.GetContent();
-            clipboardWasEmpty = original.AvailableFormats.Count == 0;
-            clipboardBackup = new DataPackage();
-            foreach (var format in original.AvailableFormats)
+            if (!skipClipboard)
             {
-                try
+                // Preserve readable original formats in memory only, never in a test report or repository.
+                var original = Clipboard.GetContent();
+                clipboardWasEmpty = original.AvailableFormats.Count == 0;
+                clipboardBackup = new DataPackage();
+                foreach (var format in original.AvailableFormats)
                 {
-                    var data = await original.GetDataAsync(format);
-                    if (data is RandomAccessStreamReference reference)
+                    try
                     {
-                        using var stream = await reference.OpenReadAsync();
-                        var saved = new InMemoryRandomAccessStream();
-                        await RandomAccessStream.CopyAsync(stream, saved);
-                        saved.Seek(0);
-                        clipboardStreams.Add(saved);
-                        data = RandomAccessStreamReference.CreateFromStream(saved);
+                        var data = await original.GetDataAsync(format);
+                        if (data is RandomAccessStreamReference reference)
+                        {
+                            using var stream = await reference.OpenReadAsync();
+                            var saved = new InMemoryRandomAccessStream();
+                            await RandomAccessStream.CopyAsync(stream, saved);
+                            saved.Seek(0);
+                            clipboardStreams.Add(saved);
+                            data = RandomAccessStreamReference.CreateFromStream(saved);
+                        }
+                        clipboardBackup.SetData(format, data);
                     }
-                    clipboardBackup.SetData(format, data);
+                    catch (Exception) { missingFormats++; }
                 }
-                catch (Exception) { missingFormats++; }
+                checks.Add(new { Name = "clipboard-backup", ReadableFormats = original.AvailableFormats.Count - missingFormats, UnsupportedFormats = missingFormats });
             }
-            checks.Add(new { Name = "clipboard-backup", ReadableFormats = original.AvailableFormats.Count - missingFormats, UnsupportedFormats = missingFormats });
 
             SearchBox.Text = "TAIL-LONGTEXT-0000";
             await AwaitStateAsync(() => !_queryPending && _criteria?.Query == "TAIL-LONGTEXT-0000" && _previewTask.IsCompleted && Selected is not null, "long-text search and preview completed");
             Check(_totalEntries == 1 && Selected?.Content?.EndsWith("TAIL-LONGTEXT-0000", StringComparison.Ordinal) == true, "Search finds suffix beyond the list summary");
             var full = Selected!.Content;
-            clipboardUsed = true;
-            await CopyOrPasteAsync(false);
-            Check(await Clipboard.GetContent().GetTextAsync() == full, "Copy preserves complete long text");
-            checks.Add(new { Name = "full-content-copy", Characters = full!.Length });
+            if (!skipClipboard)
+            {
+                clipboardUsed = true;
+                await CopyOrPasteAsync(false);
+                Check(await Clipboard.GetContent().GetTextAsync() == full, "Copy preserves complete long text");
+                checks.Add(new { Name = "full-content-copy", Characters = full!.Length });
+            }
             SearchBox.Text = "query-that-must-never-win";
             SearchBox.Text = "TAIL-LONGTEXT-0000";
             await AwaitStateAsync(() => !_queryPending && _criteria?.Query == "TAIL-LONGTEXT-0000", "latest query completed");
@@ -100,23 +107,27 @@ public sealed partial class MainWindow
             Check(Selected?.Id == images[79 % images.Length].Entry.Id && PreviewImage.Source is WriteableBitmap, "Rapid selection drops stale previews");
             checks.Add(new { Name = "large-image-switching", Sequential = 240, Overlapping = 80, CacheEntries = _previewCache.Count });
 
-            var prefix = "ClipNest-fast-" + Guid.NewGuid().ToString("N") + "-";
-            var rapid = Stopwatch.StartNew();
-            for (var index = 0; index < 100; index++)
+            if (!skipClipboard)
             {
-                await SetClipboardTextAsync(prefix + index.ToString("D4", CultureInfo.InvariantCulture));
-                await Task.Delay(20);
+                var prefix = "ClipNest-fast-" + Guid.NewGuid().ToString("N") + "-";
+                var rapid = Stopwatch.StartNew();
+                for (var index = 0; index < 100; index++)
+                {
+                    await SetClipboardTextAsync(prefix + index.ToString("D4", CultureInfo.InvariantCulture));
+                    await Task.Delay(20);
+                }
+                var sentMs = rapid.Elapsed.TotalMilliseconds;
+                var drain = Stopwatch.StartNew();
+                ClipboardHistoryPage rapidPage;
+                do
+                {
+                    await Task.Delay(100);
+                    rapidPage = await Task.Run(() => _store.GetPage(prefix, false));
+                } while (rapidPage.TotalCount < 100 && drain.Elapsed < TimeSpan.FromSeconds(15));
+                checks.Add(new { Name = "rapid-real-clipboard", Sent = 100, Captured = rapidPage.TotalCount, RequestedGapMs = 20, ActualSendMs = sentMs });
+                Check(rapidPage.TotalCount == 100, $"Rapid copy preserved {rapidPage.TotalCount}/100 distinct values");
             }
-            var sentMs = rapid.Elapsed.TotalMilliseconds;
-            var drain = Stopwatch.StartNew();
-            ClipboardHistoryPage rapidPage;
-            do
-            {
-                await Task.Delay(100);
-                rapidPage = await Task.Run(() => _store.GetPage(prefix, false));
-            } while (rapidPage.TotalCount < 100 && drain.Elapsed < TimeSpan.FromSeconds(15));
-            checks.Add(new { Name = "rapid-real-clipboard", Sent = 100, Captured = rapidPage.TotalCount, RequestedGapMs = 20, ActualSendMs = sentMs });
-            Check(rapidPage.TotalCount == 100, $"Rapid copy preserved {rapidPage.TotalCount}/100 distinct values");
+            else checks.Add(new { Name = "clipboard-phases-skipped", Reason = "Isolated soak does not rewrite the system clipboard; run default diagnostics separately for clipboard validation." });
 
             await RestoreClipboardAsync();
             AppWindow.Hide();
@@ -171,7 +182,7 @@ public sealed partial class MainWindow
             timings.Sort();
             await File.WriteAllTextAsync(Path.Combine(output, "result.json"), JsonSerializer.Serialize(new
             {
-                Status = status, StartedUtc = started, EndedUtc = DateTimeOffset.UtcNow, RequestedSoakMinutes = minutes,
+                Status = status, StartedUtc = started, EndedUtc = DateTimeOffset.UtcNow, RequestedSoakMinutes = minutes, ClipboardPhasesSkipped = skipClipboard,
                 Checks = checks, Samples = samples, Failures = failures,
                 ImageSwitchP95Ms = timings.Count == 0 ? 0 : timings[(int)Math.Ceiling(timings.Count * .95) - 1],
                 ImageSwitchMaxMs = timings.Count == 0 ? 0 : timings[^1]
@@ -210,7 +221,10 @@ public sealed partial class MainWindow
             }
         }
         async Task WriteProgressAsync(string phase, double completedMinutes)
-            => await File.WriteAllTextAsync(Path.Combine(output, "progress.json"), JsonSerializer.Serialize(new { Phase = phase, CompletedMinutes = completedMinutes, RequestedMinutes = minutes, Samples = samples.Count, Checks = checks }));
+        {
+            await File.WriteAllTextAsync(Path.Combine(output, "samples.partial.json"), JsonSerializer.Serialize(samples));
+            await File.WriteAllTextAsync(Path.Combine(output, "progress.json"), JsonSerializer.Serialize(new { Phase = phase, StartedUtc = started, CompletedMinutes = completedMinutes, RequestedMinutes = minutes, ClipboardPhasesSkipped = skipClipboard, Samples = samples.Count, Checks = checks }));
+        }
     }
 
     private static async Task SetClipboardTextAsync(string text)

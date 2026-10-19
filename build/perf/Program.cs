@@ -54,6 +54,12 @@ foreach (var scenario in new[] { ("normal-100", 100, 512), ("normal-1000", 1000,
     });
     report.Add(write);
     Console.WriteLine(JsonSerializer.Serialize(write));
+    if (label == "large-text-1000")
+    {
+        var sameSize = Measure(label, "page-recent-500", 25, () => store.GetPage("", false, count: 500).Items.Count);
+        report.Add(sameSize);
+        Console.WriteLine(JsonSerializer.Serialize(sameSize));
+    }
     var limit = new SqliteAppSettingsStore(database);
     store.SetHistoryLimitAndTrim(10);
     var afterLimitChange = store.GetRecent(count + 100);

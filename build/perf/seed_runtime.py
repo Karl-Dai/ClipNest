@@ -8,7 +8,9 @@ import time
 import uuid
 from PIL import Image, ImageDraw
 
-base = Path(argparse.ArgumentParser(description=__doc__).parse_known_args()[1][0]).resolve()
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("base", type=Path)
+base = parser.parse_args().base.resolve()
 if base.exists():
     raise SystemExit("Choose a new fixture directory")
 root = base / "ClipNest"
