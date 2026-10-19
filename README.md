@@ -58,7 +58,7 @@
 
 **运行要求：Windows 11 22H2 或更高版本，x64。**
 
-`main` 分支已包含 0.4.1 的分页、预览与历史上限修复；本轮仅生成本地构建，尚未发布 0.4.1 Release。下载版本以发布页为准，验证范围见 [0.4.1 测试报告](docs/testing-0.4.1.md)。
+0.4.1 修复了长文本加载、历史分页与上限设置问题，验证范围见 [测试报告](docs/testing-0.4.1.md)。[下载 0.4.1](https://github.com/Karl-Dai/ClipNest/releases/tag/v0.4.1)，此版本暂未代码签名。
 
 | 版本 | 发布页中的文件 | 适合谁 |
 | --- | --- | --- |
@@ -74,7 +74,7 @@
 可使用发布页的 `.sha256` 文件校验下载：
 
 ```powershell
-Get-FileHash .\ClipNest-0.4.0-Setup-x64.exe -Algorithm SHA256
+Get-FileHash .\ClipNest-0.4.1-Setup-x64.exe -Algorithm SHA256
 ```
 
 ### 更新版本

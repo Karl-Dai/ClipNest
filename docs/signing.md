@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-截至 2026-10-18，公开发布的 0.4.0 未签名。本机未发现代码签名证书，GitHub 仓库也没有签名机密。
+截至 2026-10-19，0.4.0 与 0.4.1 均未签名。本机未发现代码签名证书，GitHub 仓库也没有签名机密。
 已接入基于 Windows 证书存储及 SignTool 的签名构建；取得真实证书前，不能生成显示已验证发布者的正式安装程序。
 目前只验证了构建防护和验签失败路径，真实证书签名、安装提示及更新签名还需拿到证书后实测。
 
@@ -31,8 +31,8 @@
 # 查询的是公开证书指纹；不导出私钥。
 Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object Subject, Thumbprint, NotAfter
 
-# 版本必须高于已经发布的 0.4.0。以下指纹请替换为实际值。
-./build/package.ps1 -Version 0.4.1 -RequireSignature -SignCertificateThumbprint '<40位证书指纹>'
+# 版本必须高于已经发布的 0.4.1。以下指纹请替换为实际值。
+./build/package.ps1 -Version 0.4.2 -RequireSignature -SignCertificateThumbprint '<40位证书指纹>'
 ```
 
 默认使用固定版本 Velopack 自带的 SignTool，也可以用 `-SignToolPath` 指定 Windows SDK 工具。
@@ -52,7 +52,8 @@ Velopack 在打包期间为生成的更新器和安装器签名。产物复制�
 普通构建工作流仍生成未签名的开发验证产物。`release.yml` 始终传入 `-RequireSignature`，
 通过仓库变量 `CLIPNEST_SIGN_CERT_THUMBPRINT` 指定证书，缺失时立即失败。
 仅配置指纹不够：签名提供程序和私钥访问权限也必须先配置在运行器上。
-当前 GitHub 托管运行器尚未配置任何提供程序，正式发布暂不能执行。
+当前 GitHub 托管运行器尚未配置任何提供程序，因此此签名工作流暂不能执行。
+0.4.1 采用本地构建、草稿上传与校验后公开的手动流程，暂以未签名包发布，并在发布说明中明确标注；工作流的签名要求保持不变。
 确定 CA 后再接入其受支持的云签名或专用运行器；手机确认式云证书不应宣称已实现无人值守签名。
 
 ## 发布者与 SmartScreen

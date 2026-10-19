@@ -1,6 +1,6 @@
 # 0.4.1 修复与验证
 
-日期：2026-10-18～19。面向 Windows 11 x64。本轮生成本地安装包与便携包，没有发布新的 GitHub Release，仍未代码签名。
+日期：2026-10-18～19。面向 Windows 11 x64。报告对应 0.4.1 安装包与便携包；[GitHub Release](https://github.com/Karl-Dai/ClipNest/releases/tag/v0.4.1) 提供下载，此版本未代码签名。
 
 本机实测系统为 Windows 11 专业版 x64，系统构建 26300；这不代表已覆盖所有 Windows 11 版本与硬件。
 
