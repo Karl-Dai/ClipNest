@@ -48,6 +48,8 @@ try {
         }
     }
     Copy-Item README.md "$portable/使用说明.md"
+    Copy-Item README.md "$portable/README.md"
+    Copy-Item README.en.md "$portable/README.en.md"
     Copy-Item UPSTREAM.md "$portable/UPSTREAM.md"
     Copy-Item CHANGELOG.md "$portable/CHANGELOG.md"
     New-Item -ItemType Directory -Path "$portable/docs", "$portable/design" -Force | Out-Null

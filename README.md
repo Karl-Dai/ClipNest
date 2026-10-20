@@ -4,9 +4,13 @@
 
 # 拾贴 ClipNest
 
+**简体中文** · [English](README.en.md)
+
 **复制过的内容，随时找回来。**
 
 面向 Windows 11 的本地剪贴板管理器。用一个悬浮面板，收好文字、图片和常用片段。
+
+A native clipboard manager for Windows 11, with a floating panel for text, images and frequently used snippets. [Read the full English guide →](README.en.md)
 
 [![Windows 11](https://img.shields.io/badge/Windows_11-22H2%2B-08786E?logo=windows&logoColor=white)](#下载与安装)
 [![Native WinUI 3](https://img.shields.io/badge/Native-WinUI_3-08786E)](#开发与构建)
@@ -71,7 +75,7 @@
 
 便携包包含 .NET 与 Windows App SDK 运行时，无需另外安装。请保留程序同目录下的 DLL、资源和子文件夹；不要只取出 EXE 单独运行。
 
-可使用发布页的 `.sha256` 文件校验下载：
+可使用发布页的 `SHA256SUMS-版本号.txt` 核对安装包与更新包，便携版也提供 `.zip.sha256`。例如计算安装包的 SHA256，再与清单比对：
 
 ```powershell
 Get-FileHash .\ClipNest-0.4.1-Setup-x64.exe -Algorithm SHA256
@@ -194,7 +198,7 @@ dotnet build ClipNest.Windows.sln -c Release
 dotnet test tests/ClipNest.Core.Tests -c Release
 dotnet run --project src/ClipNest.App
 
-# 构建、测试并生成包含运行时的便携包
+# 构建、测试并生成安装包、便携包及自动更新文件
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File build/package.ps1
 ```
 
@@ -214,7 +218,7 @@ docs/                    产品演示与上游设计文档
 
 ## 更新记录
 
-完整记录见 [CHANGELOG.md](CHANGELOG.md)。**0.4.0** 新增安装包、桌面 / 开始菜单快捷方式和 GitHub 自动更新；**0.3.1** 将快捷键改为直接按键录入；**0.3.0** 加入数据目录迁移。
+完整记录见 [CHANGELOG.md](CHANGELOG.md)。**0.4.1** 修复长文本加载、历史分页、立即应用历史上限和大图预览，验证范围见 [测试报告](docs/testing-0.4.1.md)；**0.4.0** 新增安装包、桌面 / 开始菜单快捷方式和 GitHub 自动更新；**0.3.1** 将快捷键改为直接按键录入；**0.3.0** 加入数据目录迁移。
 
 ## 来源与致谢
 
